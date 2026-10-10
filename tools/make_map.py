@@ -6,12 +6,14 @@ Builds src/maps.h – 128×64 land bitmaps for microHAMCLOCK.
 
 Source: Natural Earth (public domain), https://github.com/nvkelso/natural-earth-vector
   geojson/ne_110m_land.geojson             – land (world, Europe)
-  geojson/ne_10m_admin_0_countries.geojson – borders of Czechia
+  geojson/ne_10m_admin_0_countries.geojson – borders of Czechia, Germany, the UK and the USA
 
 Usage:
     python tools/make_map.py ne_110m_land.geojson ne_10m_admin_0_countries.geojson [--preview dir]
 
-The CZECHIA view doesn't draw land, only the territory of Czechia (borders from ne_10m_admin_0_countries).
+The CZECHIA, GERMANY, UK and USA views don't draw land, only the territory of that country (borders from
+ne_10m_admin_0_countries, matched by ADM0_A3). USA is the contiguous 48 states; Alaska and Hawaii lie
+outside the view.
 
 Each view is a rectangle in geographic coordinates (parallels
 and meridians are straight lines). Polygons are drawn at 8× scale
@@ -29,11 +31,16 @@ W, H = 128, 64
 SS = 8  # supersampling
 
 # name, west, east, north, south (degrees), what is drawn
-# Czechia: 4.7 km per pixel both ways, so the country isn't stretched.
+# The country views have the same km per pixel both ways, so the country isn't stretched:
+# Czechia 4.7 km, Germany 14 km, UK 19 km, USA 45 km (Germany and the UK are tall, so their views reach
+# far east and west of them).
 VIEWS = [
     ("WORLD", -180.0, 180.0, 90.0, -90.0, "land"),
     ("EUROPE", -30.0, 50.0, 72.0, 30.0, "land"),
     ("CZECHIA", 11.3, 19.6, 51.15, 48.45, "CZE"),
+    ("GERMANY", -2.3, 23.2, 55.15, 47.15, "DEU"),
+    ("UK", -22.9, 16.5, 61.0, 49.8, "GBR"),
+    ("USA", -128.5, -63.5, 50.0, 24.0, "USA"),
 ]
 
 

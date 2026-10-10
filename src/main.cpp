@@ -19,7 +19,8 @@
     double click  – automatic screen rotation on/off
     triple click  – status screen (Wi-Fi, MQTT, data)
     long press    – (after holding 0.7 s) list: sort by time / distance
-                    map: view AUTO → WORLD → EUROPE → CZECHIA
+                    map: view AUTO → WORLD → EUROPE → CZECHIA → GERMANY → UK → USA
+                    (the country views only when switched on in the settings)
     hold 10 s     – setup mode (hotspot), works even while waiting for Wi-Fi
 
   Settings (language, Wi-Fi, callsign, locator) can be entered in two ways:
@@ -29,7 +30,7 @@
     – via the serial console at 115200 Bd with the "setup" command; the board asks for everything.
   Everything is stored in NVS. The "status" command prints what is going on.
 
-  The display and web are in English (default) or Czech, texts are in src/lang/*.inc
+  The display and web are in English (default), Czech or German, texts are in src/lang/*.inc
   (see i18n.h). The serial console is English only.
 */
 
@@ -326,7 +327,7 @@ struct Config {
   char pass[65];
   char call[12];
   char loc[7];
-  char lang[4];                     // display and web language code ("en", "cs"); English by default
+  char lang[4];                     // display and web language code ("en", "cs", "de"); English by default
   char tz[32];                      // time zone ID (see tz.h), e.g. "Europe/Prague" or "UTC+3"
   uint8_t saverMin;                 // saver after this many idle minutes, 0 = never
   uint8_t saverMode;                // SaverMode
@@ -342,6 +343,7 @@ struct Config {
   uint8_t nvisMargin;               // NVIS: how many % below foF2 the band must lie
   bool nvis60;                      // NVIS: recommend the 60 m band too
   char iono[8];                     // GIRO ionosonde code (e.g. "PQ052"); empty = nearest
+  bool mapCz, mapDe, mapUk, mapUs;  // the Czechia, Germany, UK and USA map views are offered (off by default)
 };
 static Config cfg;
 static Preferences prefs;
@@ -392,6 +394,10 @@ static void loadConfig() {
   cfg.nvisMargin = min<int>(prefs.getUChar("nvismg", 0), MAX_NVIS_MARGIN);
   cfg.nvis60 = prefs.getBool("nvis60", true);
   loadString("iono", cfg.iono, sizeof cfg.iono);
+  cfg.mapCz = prefs.getBool("mapcz", false);
+  cfg.mapDe = prefs.getBool("mapde", false);
+  cfg.mapUs = prefs.getBool("mapus", false);
+  cfg.mapUk = prefs.getBool("mapuk", false);
 }
 
 static void saveConfig(const Config &c) {
@@ -416,6 +422,10 @@ static void saveConfig(const Config &c) {
   prefs.putUChar("nvismg", c.nvisMargin);
   prefs.putBool("nvis60", c.nvis60);
   prefs.putString("iono", c.iono);
+  prefs.putBool("mapcz", c.mapCz);
+  prefs.putBool("mapde", c.mapDe);
+  prefs.putBool("mapus", c.mapUs);
+  prefs.putBool("mapuk", c.mapUk);
   if (prefs.isKey("tz")) prefs.remove("tz");            // POSIX string from version 0.1, no longer used
 }
 
@@ -426,7 +436,7 @@ static Lang cfgLang(const Config &c) {
   return langFromCode(c.lang, l) ? l : LANG_EN;
 }
 
-// List of language codes for help, e.g. "en, cs".
+// List of language codes for help, e.g. "en, cs, de".
 static void langCodes(char *out, size_t n) {
   out[0] = 0;
   for (int l = 0; l < LANG_COUNT; l++) {
@@ -747,11 +757,12 @@ static bool jsonStr(const char *js, const char *key, char *out, size_t n) {
   return i > 0;
 }
 
-static bool jsonLong(const char *js, const char *key, long &v) {
+// 64-bit: a 32-bit long would clamp unix times after January 2038.
+static bool jsonLong(const char *js, const char *key, long long &v) {
   const char *p = jsonFind(js, key);
   if (!p) return false;
   char *end;
-  v = strtol(p, &end, 10);
+  v = strtoll(p, &end, 10);
   return end != p;
 }
 
@@ -760,7 +771,7 @@ static bool jsonLong(const char *js, const char *key, long &v) {
 static void handleSpot(const char *js) {
   Spot s = {};
   char loc[12];
-  long snr = 0, t = 0;
+  long long snr = 0, t = 0;
   if (!jsonStr(js, "rc", s.call, sizeof s.call) || !jsonStr(js, "rl", loc, sizeof loc)) return;
   for (char *c = s.call; *c; c++) *c = toupper((unsigned char)*c);   // the font would draw a lowercase "s" as lowercase
   if (!strcmp(s.call, "N0CALL")) return;   // default callsign in programs where nobody has set one
@@ -993,7 +1004,7 @@ static bool parseIonoRecord(const String &js, int from, int to, Iono &io) {
     return false;
   int Y, M, D, h, m;
   if (sscanf(when, "%d-%d-%dT%d:%d", &Y, &M, &D, &h, &m) != 5) return false;
-  io.measuredAt = daysFromCivil(Y, M, D) * 86400 + h * 3600 + m * 60;
+  io.measuredAt = (int64_t)daysFromCivil(Y, M, D) * 86400 + h * 3600 + m * 60;   // int32 would overflow in 2038
   jsonNumber(js, from, to, "mufd", io.mufd);
   jsonText(js, from, to, "name", io.name, sizeof io.name);
   if (homeOk && jsonText(js, from, to, "latitude", lat, sizeof lat) && jsonText(js, from, to, "longitude", lon, sizeof lon)) {
@@ -1463,6 +1474,8 @@ static void printStatus() {
   Serial.printf("Brightness: day %d %%, night %d %%, dim %d %%, life %d %%\n", contrastToPct(cfg.bright[BR_DAY]),
                 contrastToPct(cfg.bright[BR_NIGHT]), contrastToPct(cfg.bright[BR_DIM]), contrastToPct(cfg.bright[BR_LIFE]));
   Serial.printf("NVIS: margin %u %% below foF2, 60 m %s\n", cfg.nvisMargin, cfg.nvis60 ? "on" : "off");
+  Serial.printf("Country maps: Czechia %s, Germany %s, UK %s, USA %s\n", cfg.mapCz ? "on" : "off",
+                cfg.mapDe ? "on" : "off", cfg.mapUk ? "on" : "off", cfg.mapUs ? "on" : "off");
   if (!cfg.ssid[0]) Serial.println("WiFi: not set up (command setup)");
   else if (wifiUp)  Serial.printf("WiFi: %s, IP %s, %d dBm\n", cfg.ssid, WiFi.localIP().toString().c_str(), WiFi.RSSI());
   else              Serial.printf("WiFi: connecting to %s\n", cfg.ssid);
@@ -1786,7 +1799,8 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
 
   // advanced: display brightness; collapsed while everything is at defaults
   bool custom = memcmp(v.bright, BRIGHT_DEFAULT, sizeof BRIGHT_DEFAULT) != 0 || v.nvisMargin || !v.nvis60 || v.iono[0] ||
-                v.rotateSec != DEFAULT_ROTATE_S || v.lifeOff || v.lifeDays != DEFAULT_LIFE_DAYS;
+                v.rotateSec != DEFAULT_ROTATE_S || v.lifeOff || v.lifeDays != DEFAULT_LIFE_DAYS || v.mapCz || v.mapDe ||
+                v.mapUk || v.mapUs;
   b += custom ? "<details open><summary>" : "<details><summary>";
   b += tr(W_ADVANCED, lang);
   b += "</summary><label for=rotsec>";
@@ -1850,6 +1864,24 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
   b += htmlEscape(tr(W_IONO_AUTO, lang));
   b += "' value='" + htmlEscape(v.iono) + "'><small>";
   b += tr(W_IONO_HINT, lang);
+  b += "</small><b>";               // country map views, offered by the long press on the map
+  b += tr(W_MAPS, lang);
+  b += "</b>";
+  auto mapBox = [&](const char *name, bool on, StrId text) {
+    b += "<label class=chk><input type=checkbox name=";
+    b += name;
+    b += " value=1";
+    if (on) b += " checked";
+    b += "> ";
+    b += tr(text, lang);
+    b += "</label>";
+  };
+  mapBox("mapcz", v.mapCz, W_MAP_CZ);
+  mapBox("mapde", v.mapDe, W_MAP_DE);
+  mapBox("mapuk", v.mapUk, W_MAP_UK);
+  mapBox("mapus", v.mapUs, W_MAP_US);
+  b += "<small>";
+  b += tr(W_MAPS_HINT, lang);
   b += "</small></details>";
 
   b += "<button type=submit>";
@@ -1983,6 +2015,10 @@ static void handleSave() {
   bool ionoOk = ionoArg.length() < sizeof d.iono;
   for (size_t i = 0; i < ionoArg.length(); i++) ionoOk &= isalnum((unsigned char)ionoArg[i]) || ionoArg[i] == '_';
   strlcpy(d.iono, ionoArg.c_str(), sizeof d.iono);
+  d.mapCz = web.hasArg("mapcz");
+  d.mapDe = web.hasArg("mapde");
+  d.mapUs = web.hasArg("mapus");
+  d.mapUk = web.hasArg("mapuk");
 
   int err = checkBasic(d, web.arg("ssid"), web.arg("pass"), web.hasArg("open"), web.arg("call"), web.arg("loc"),
                        web.arg("tz"));
@@ -2347,8 +2383,23 @@ static void serialService() {
 // ============================ SCREENS ============================
 
 enum Screen { S_CLOCK, S_SOLAR, S_PSK_LIST, S_PSK_MAP, SCREEN_COUNT };
-enum MapMode { MM_AUTO, MM_WORLD, MM_EUROPE, MM_CZECHIA, MM_COUNT };
-static const StrId MAP_MODE_NAME[MM_COUNT] = {S_MAP_AUTO, S_MAP_WORLD, S_MAP_EUROPE, S_MAP_CZECHIA};
+// The country views (from MM_CZECHIA on) show only the territory of the country and are offered only when
+// switched on in the settings. New views go at the end, the number is stored in NVS.
+enum MapMode { MM_AUTO, MM_WORLD, MM_EUROPE, MM_CZECHIA, MM_GERMANY, MM_UK, MM_USA, MM_COUNT };
+static const StrId MAP_MODE_NAME[MM_COUNT] = {S_MAP_AUTO,    S_MAP_WORLD, S_MAP_EUROPE, S_MAP_CZECHIA,
+                                              S_MAP_GERMANY, S_MAP_UK,    S_MAP_USA};
+static const MapView *const MAP_OF[MM_COUNT] = {nullptr,      &MAP_WORLD, &MAP_EUROPE, &MAP_CZECHIA,
+                                                &MAP_GERMANY, &MAP_UK,    &MAP_USA};
+
+static bool mapEnabled(int m) {
+  switch (m) {
+    case MM_CZECHIA: return cfg.mapCz;
+    case MM_GERMANY: return cfg.mapDe;
+    case MM_UK:      return cfg.mapUk;
+    case MM_USA:     return cfg.mapUs;
+    default:         return true;
+  }
+}
 
 static int screen = S_CLOCK;
 static bool showStatus, sortByDist;
@@ -2574,35 +2625,47 @@ static void mapXY(const MapView &m, float lat, float lon, int &x, int &y) {
   y = (int)floorf((m.north - lat) / (m.north - m.south) * 64);
 }
 
-// Is the point inside the Czech borders? (by the Czechia map mask, accurate to ~5 km)
-static bool inCzechia(float lat, float lon) {
-  if (!inView(MAP_CZECHIA, lat, lon)) return false;
+// Is the point inside the country of a country view? By its mask, with one pixel to spare, so a station
+// on the coast (45 km per pixel on the USA map) isn't taken for one at sea.
+static bool inCountry(const MapView &m, float lat, float lon) {
+  if (!inView(m, lat, lon)) return false;
   int x, y;
-  mapXY(MAP_CZECHIA, lat, lon, x, y);
-  return mapBit(MAP_CZECHIA, x, y);
+  mapXY(m, lat, lon, x, y);
+  for (int dy = -1; dy <= 1; dy++)
+    for (int dx = -1; dx <= 1; dx++) {
+      int xx = x + dx, yy = y + dy;
+      if (xx >= 0 && xx < 128 && yy >= 0 && yy < 64 && mapBit(m, xx, yy)) return true;
+    }
+  return false;
+}
+
+// Are home and all spots inside the view (country = inside the country itself)?
+static bool allIn(const MapView &m, bool country) {
+  auto in = [&](float lat, float lon) { return country ? inCountry(m, lat, lon) : inView(m, lat, lon); };
+  if (homeOk && !in(homeLat, homeLon)) return false;
+  for (int i = 0; i < snapCount; i++)
+    if (!in(snap[i].lat, snap[i].lon)) return false;
+  return true;
 }
 
 static void renderPskMap() {
   takeSnapshot();
-  const MapView *m = &MAP_WORLD;
-  if (mapMode == MM_EUROPE) {
-    m = &MAP_EUROPE;
-  } else if (mapMode == MM_CZECHIA) {
-    m = &MAP_CZECHIA;
-  } else if (mapMode == MM_AUTO && snapCount) {   // all in Czechia → Czechia, all in Europe → Europe
-    bool cr = !homeOk || inCzechia(homeLat, homeLon), eu = !homeOk || inView(MAP_EUROPE, homeLat, homeLon);
-    for (int i = 0; i < snapCount && eu; i++) {
-      cr = cr && inCzechia(snap[i].lat, snap[i].lon);
-      eu = inView(MAP_EUROPE, snap[i].lat, snap[i].lon);
+  int mode = mapEnabled(mapMode) ? mapMode : MM_AUTO;
+  if (mode == MM_AUTO) {   // all in a switched-on country → that country, all in Europe → Europe, else the world
+    mode = MM_WORLD;
+    if (snapCount) {
+      for (int c = MM_CZECHIA; c < MM_COUNT && mode == MM_WORLD; c++)
+        if (mapEnabled(c) && allIn(*MAP_OF[c], true)) mode = c;
+      if (mode == MM_WORLD && allIn(MAP_EUROPE, false)) mode = MM_EUROPE;
     }
-    if (cr) m = &MAP_CZECHIA;
-    else if (eu) m = &MAP_EUROPE;
   }
+  const MapView *m = MAP_OF[mode];
   bool wrap = m->east - m->west >= 360;
 
   // By day land is filled with dots, at night only the outline remains – forming the grey line.
-  // The Czechia map is just the border outline; day and night make no sense on it.
-  bool fill = m != &MAP_CZECHIA;
+  // The Czechia, Germany and UK maps are just the border outline; day and night make no sense on them.
+  // The USA spans four time zones, so it keeps them.
+  bool fill = mode == MM_USA || mode < MM_CZECHIA;
   bool sun = timeValid();
   float decl = 0, subLon = 0;
   if (sun) subsolarPoint(time(nullptr), decl, subLon);
@@ -2856,7 +2919,7 @@ static void handleButton(uint32_t now) {
         prefs.putBool("sortdist", sortByDist);
         flash(tr(sortByDist ? S_SORT_KM : S_SORT_TIME));
       } else if (screen == S_PSK_MAP) {
-        mapMode = (mapMode + 1) % MM_COUNT;
+        do mapMode = (mapMode + 1) % MM_COUNT; while (!mapEnabled(mapMode));   // skip switched-off views
         prefs.putUChar("mapmode", mapMode);
         flash(tr(MAP_MODE_NAME[mapMode]));
       }

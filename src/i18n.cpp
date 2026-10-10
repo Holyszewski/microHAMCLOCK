@@ -27,6 +27,12 @@ const Entry CS_ENTRIES[] = {
 #undef TR
 };
 
+const Entry DE_ENTRIES[] = {
+#define TR(id, text) {id, text},
+#include "lang/de.inc"
+#undef TR
+};
+
 struct LangDef {
   LangInfo info;
   const Entry *entries;             // nullptr = English only
@@ -38,6 +44,7 @@ struct LangDef {
 const LangDef LANGS[] = {
   {{"en", "English", "English"}, nullptr, 0},
   {{"cs", "Cestina", "Čeština"}, ENTRIES(CS_ENTRIES)},
+  {{"de", "Deutsch", "Deutsch"}, ENTRIES(DE_ENTRIES)},
 };
 static_assert(sizeof LANGS / sizeof LANGS[0] == LANG_COUNT, "LANGS and enum Lang must have the same number of languages");
 

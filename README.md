@@ -31,14 +31,14 @@ own: the board talks straight to public ham radio data feeds over Wi-Fi.
   measurement, picked automatically from your locator, plus the **recommended NVIS band**.
 - 👂 **Who hears me**: live PSKReporter spots of your callsign over MQTT, any mode that gets
   decoded automatically (FT8, FT4, JS8, PSK, RTTY, CW…). Your `/P` and `/M` variants are included.
-- 🗺️ **Map**: world, Europe and Czechia views with the day/night terminator. AUTO zooms to fit
-  your spots, and new spots pulse.
+- 🗺️ **Map**: world and Europe views with the day/night terminator, plus optional Czechia,
+  Germany, UK and USA maps. AUTO zooms to fit your spots, and new spots pulse.
 - 🌙 **Kind to the OLED**: screen saver (off, Game of Life, or dim and shift), night mode, and an
   optional wake-up when a new spot arrives, with an LED flash if you like.
 - 📱 **Easy setup**: install and set up in one browser page over USB, or from your phone through
   the board's own Wi-Fi hotspot. No passwords in the firmware, and entering setup never erases
   what you saved.
-- 🌍 **Localized**: English and Czech on the display and the setup page, and easy to translate.
+- 🌍 **Localized**: English, Czech and German on the display and the setup page, and easy to translate.
 - 🪶 **Lightweight**: plain C++ on the Arduino core, with no external libraries.
 
 ## Screens
@@ -104,7 +104,7 @@ One button, **PRG**:
 | Short | next screen |
 | Double | auto-rotate screens on/off (15 s per screen by default) |
 | Triple | status screen (Wi-Fi, IP, MQTT, data age, version) |
-| Long (0.7 s) | list: sort by time or distance · map: AUTO → WORLD → EUROPE → CZECHIA |
+| Long (0.7 s) | list: sort by time or distance · map: AUTO → WORLD → EUROPE (→ CZECHIA → GERMANY → UK → USA, when switched on) |
 | Hold 10 s | setup mode (hotspot) |
 
 ## Data sources and thanks

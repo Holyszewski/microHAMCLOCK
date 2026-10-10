@@ -26,7 +26,7 @@ enum StrId : uint16_t {
 
 // The order must match the LANGS table in i18n.cpp. NVS stores the language code,
 // not the number, so the order can change.
-enum Lang : uint8_t { LANG_EN, LANG_CS, LANG_COUNT };
+enum Lang : uint8_t { LANG_EN, LANG_CS, LANG_DE, LANG_COUNT };
 
 struct LangInfo {
   const char *code;        // ISO 639-1, e.g. "en"

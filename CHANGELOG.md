@@ -7,6 +7,17 @@ releases are listed in the Unreleased section.
 
 ## Unreleased
 
+- German language on the display and the setup page.
+- Map: new Germany and UK (border outline, like Czechia) and USA (the 48
+  contiguous states, with day and night) views. They and the Czechia view
+  are now switched on
+  in Advanced on the setup page, each off by default, so the long press
+  and AUTO only use the countries you want. Czechia has to be switched
+  on again on boards that used it. AUTO allows one pixel around the
+  border, so coastal stations count as inside the country.
+- Fix: spot times from PSKReporter and ionosonde measurement times were
+  read through signed 32-bit numbers that overflow in January 2038. The
+  system clock itself is still 32-bit on the current Arduino core.
 - Fix: foF2 and MUF on the propagation screen could stay `--` for hours.
   The KC2G parser found records by their first key (`"source"`), but
   KC2G changes the key order of its records, so after such a change no

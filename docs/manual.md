@@ -17,8 +17,8 @@ the display (for example `v0.5.1+3`), and the exact git description in
 
 ## Language
 
-The display and the setup page are available in **English** (the default)
-and **Czech**. You choose the language during setup: on the web page it is
+The display and the setup page are available in **English** (the default),
+**Czech** and **German**. You choose the language during setup: on the web page it is
 the first field of the form (the page switches right away), in the console
 it is the wizard's first question. The serial console is always in English.
 
@@ -118,7 +118,7 @@ pio device monitor
 
 and type `setup`. The board asks you, step by step, for:
 
-1. the display language (`en`, `cs`),
+1. the display language (`en`, `cs`, `de`),
 2. the Wi-Fi network (SSID) and password,
 3. your callsign,
 4. your locator (4 or 6 characters, for example JO70va),
@@ -201,11 +201,15 @@ The **Advanced** section also has the propagation options:
   example `PQ052` (Průhonice); the codes are on the map at
   [prop.kc2g.com](https://prop.kc2g.com/).
 
+**Country maps** in **Advanced** add the maps of single countries to the
+map views: Czechia, Germany, the United Kingdom and the USA (the 48
+contiguous states). All are off by default. See the map screen below.
+
 Other console commands:
 
 | command    | what it does                                                  |
 |------------|---------------------------------------------------------------|
-| `status`   | prints the settings (time zone, screen rotation, screen saver, Game of Life limit, night, brightness, NVIS, ionosonde choice), Wi-Fi, time, MQTT, spot count and propagation data (formerly `stav`, which still works) |
+| `status`   | prints the settings (time zone, screen rotation, screen saver, Game of Life limit, night, brightness, NVIS, country maps, ionosonde choice), Wi-Fi, time, MQTT, spot count and propagation data (formerly `stav`, which still works) |
 | `snapshot` | prints the display contents; `python tools/snapshot.py COM4 screen.png` turns them into a PNG (formerly `snimek`, which still works) |
 | `blink`    | switches to the propagation screen and demonstrates the flash, as if new data had arrived |
 | `saver`    | turns the screen saver on right away: `saver` the one you set, `saver off`, `saver life` or `saver dim` a given one. The settings don't change; the button, or a spot when spots may wake the display, ends it as usual. Handy for trying the savers and the LED flash on a spot without waiting |
@@ -223,10 +227,15 @@ On the map your home is an empty square with a dot, each spot a filled
 square, and new spots blink for the first minute. The number in the bottom
 left corner is the count of spots visible on the map.
 
-The map has three views: WORLD, EUROPE and CZECHIA. The Czechia map is just
-the outline of the borders, without day and night. In AUTO mode it shows
-Czechia when your home and all spots are in Czechia, Europe when they are
-all in Europe, and otherwise the whole world.
+The map has the views WORLD and EUROPE, and the country views CZECHIA,
+GERMANY, UK and USA, each of which you switch on in **Advanced** (all off
+by default). A country map shows just the territory of that country. The
+Czechia, Germany and UK maps are just the outline of the borders, without
+day and night; the USA
+map (the 48 contiguous states, without Alaska and Hawaii) has day and night
+like the others. In AUTO mode the map shows a switched-on country when your
+home and all spots are in it, Europe when they are all in Europe, and
+otherwise the whole world.
 
 ## Controls (PRG button)
 
@@ -235,7 +244,7 @@ all in Europe, and otherwise the whole world.
 | short     | next screen                                                  |
 | double    | automatic screen rotation on/off (15 s per screen, set on the web) |
 | triple    | status screen (Wi-Fi, IP, MQTT, data age, version)           |
-| long (0.7 s, fires while still held) | list: sort by time / distance; map: AUTO → WORLD → EUROPE → CZECHIA |
+| long (0.7 s, fires while still held) | list: sort by time / distance; map: AUTO → WORLD → EUROPE → CZECHIA → GERMANY → UK → USA (only the switched-on countries) |
 | hold 10 s | setup mode (hotspot), see Setup                              |
 
 Rotation, sorting and the map view are saved to flash memory. The long
@@ -271,7 +280,7 @@ dimmed, see Screen saver and night.
   standard). `tik.cesnet.cz` and `pool.ntp.org` serve as backups. The board
   synchronizes after connecting to Wi-Fi and then about every hour.
 - **Map** – Natural Earth (public domain): land from `ne_110m_land`, the
-  Czech borders from `ne_10m_admin_0_countries`. The `tools/make_map.py`
+  borders of Czechia, Germany, the UK and the USA from `ne_10m_admin_0_countries`. The `tools/make_map.py`
   script turns them into 128×64 bitmaps in `src/maps.h`.
 
 All parameters (default rotation, spot window, default brightness…) are in the
