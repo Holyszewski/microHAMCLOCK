@@ -312,7 +312,7 @@ leave it first.
 - **NVIS** – the recommended band is the highest band (160–20 m) whose
   lower edge lies below foF2 reduced by the margin from Advanced.
 - **Propagation** – XML from N0NBH, `https://www.hamqsl.com/solarxml.php`,
-  refreshed about every 30 minutes.
+  refreshed about every hour, as N0NBH asks.
 - **Data servers** – if a download fails, the board retries after 2 minutes,
   and each further failure doubles the wait, up to an hour. The board
   identifies itself to the servers as `microHAMCLOCK/<version>` with the

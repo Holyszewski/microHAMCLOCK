@@ -13,6 +13,8 @@ releases are listed in the Unreleased section.
 - Changed: a failed download (propagation or ionosonde) is retried after
   2 minutes and each further failure doubles the wait, up to an hour. Before,
   every board retried every 2 minutes, so an outage was hit by all of them.
+- Changed: the propagation data (hamqsl.com) is downloaded once an hour, not
+  every 30 minutes, as its operator asks.
 - Changed: refresh times and MQTT reconnects have a random spread of ±10 %,
   and the first downloads after Wi-Fi comes up fall within a minute, so boards
   that start together (after a power cut, say) do not all ask at once.
