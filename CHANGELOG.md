@@ -5,7 +5,7 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
-## Unreleased
+## 0.10.1 – 2026-10-10
 
 - Fix: the setup hotspot page listed no Wi-Fi networks. With the hotspot
   on, a scan takes about 8 s, but the Arduino core gave up after 6 s and
