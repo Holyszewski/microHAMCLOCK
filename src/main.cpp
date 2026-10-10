@@ -49,6 +49,7 @@
 #include <math.h>
 #include <esp_sntp.h>
 #include <esp_netif.h>
+#include <esp_wifi.h>
 #include <dhcpserver/dhcpserver.h>
 #include <esp_sleep.h>
 #include <driver/gpio.h>
@@ -149,6 +150,8 @@ static const uint16_t LONG_PRESS_MS   = 700;
 static const uint16_t CONFIG_HOLD_MS  = 10000; // button hold → setup mode (hotspot)
 static const uint16_t CONFIG_HINT_MS  = 2000;  // from when the countdown shows while held
 static const uint16_t PORTAL_IDLE_MIN = 10;    // a configured board leaves the hotspot by itself when idle
+static const uint16_t SCAN_TIMEOUT_MS = 20000; // Wi-Fi scan; with the hotspot on it takes about 8 s
+static const uint8_t  SCAN_RETRIES    = 2;     // an empty or failed scan is repeated this many times
 static const uint16_t DOUBLE_CLICK_MS = 300;
 static const uint16_t FLASH_MS        = 1200;  // how long a message stays up after a button press
 static const uint16_t FRAME_MS        = 200;   // how often the display is redrawn
@@ -1726,8 +1729,9 @@ struct Net { String ssid; int rssi; bool open; };
 static const int MAX_NETS = 15;
 static Net nets[MAX_NETS];          // networks found, for the form
 static int netCount;
-static bool scanRunning, restartPending;
-static uint32_t portalSeenAt, restartAt;
+static bool scanRunning, scanStartFailed, restartPending;
+static uint8_t scanTriesLeft;
+static uint32_t scanStartedAt, portalSeenAt, restartAt;
 
 static void restartSoon(uint32_t ms) {
   restartPending = true;
@@ -1774,10 +1778,33 @@ static String jsQuote(const char *s) {
   return o;
 }
 
+// A JSON string, with the quotes and escapes.
+static String jsonString(const char *s) {
+  String o = "\"";
+  for (; *s; s++) {
+    if (*s == '"' || *s == '\\') o += '\\';
+    if ((uint8_t)*s < 32) {
+      char e[8];
+      snprintf(e, sizeof e, "\\u%04x", *s);
+      o += e;
+    } else {
+      o += *s;
+    }
+  }
+  return o + '"';
+}
+
+static void scanBegin() {
+  scanRunning = true;
+  scanStartedAt = millis();
+  // asynchronous, scanService() picks up the result
+  scanStartFailed = WiFi.scanNetworks(true) == WIFI_SCAN_FAILED;
+}
+
 static void startScan() {
   if (scanRunning) return;
-  WiFi.scanNetworks(true);          // asynchronous, scanService() picks up the result
-  scanRunning = true;
+  scanTriesLeft = SCAN_RETRIES;
+  scanBegin();
 }
 
 // Network list: each only once (the strongest), sorted by signal strength.
@@ -1869,23 +1896,29 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
   b += "</select><label for=ssid>";
   b += tr(W_WIFI, lang);
   b += "</label><input type=text id=ssid name=ssid maxlength=32 required value='" + htmlEscape(v.ssid) + "'>";
+  // The script redraws the list and the line under it when a scan finishes (see handleNets).
+  b += "<div id=nets data-open='" + htmlEscape(tr(W_NET_OPEN, lang)) + "'>";
   for (int i = 0; i < netCount; i++) {
     String name = htmlEscape(nets[i].ssid.c_str());
     b += "<a href='#' class=net data-s='" + name + "'>" + name + " <small>" + nets[i].rssi + " dBm";
     if (nets[i].open) b += tr(W_NET_OPEN, lang);
     b += "</small></a>";
   }
-  if (scanRunning) {
-    b += "<small>";
-    b += tr(W_SCANNING, lang);
-    b += "</small>";
-  } else {
-    b += "<small><a href='/?scan=1&lang=";
-    b += langInfo(lang).code;
-    b += "'>";
-    b += tr(W_RESCAN, lang);
-    b += "</a></small>";
-  }
+  b += "</div><small id=scanning";
+  if (!scanRunning) b += " hidden";
+  b += ">";
+  b += tr(W_SCANNING, lang);
+  b += "</small><small id=scandone";
+  if (scanRunning) b += " hidden";
+  b += "><span id=nonets";
+  if (netCount) b += " hidden";
+  b += ">";
+  b += tr(W_NO_NETS, lang);
+  b += " </span><a id=rescan href='/?scan=1&lang=";
+  b += langInfo(lang).code;
+  b += "'>";
+  b += tr(W_RESCAN, lang);
+  b += "</a></small>";
   b += "<label for=pass>";
   b += tr(W_PASS, lang);
   b += "</label><input type=password id=pass name=pass maxlength=63";
@@ -2102,8 +2135,20 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
     b += tr(W_LEAVE, lang);
     b += "</button></form>";
   }
-  b += F("<script>document.querySelectorAll('.net').forEach(function(a){a.onclick=function(){"
-         "document.getElementById('ssid').value=a.dataset.s;document.getElementById('pass').focus();return false}});"
+  b += F("<script>"
+         // networks: a click fills in the name; the list fills in by itself when the scan finishes
+         "(function(){var L=document.getElementById('nets');function g(i){return document.getElementById(i)}"
+         "function show(busy,none){g('scanning').hidden=!busy;g('scandone').hidden=busy;g('nonets').hidden=!none}"
+         "L.onclick=function(e){var a=e.target.closest('.net');if(!a)return;e.preventDefault();"
+         "g('ssid').value=a.dataset.s;g('pass').focus()};"
+         "function poll(q){fetch('/nets'+q).then(function(r){return r.json()}).then(function(d){"
+         "if(!d.scanning){L.textContent='';d.nets.forEach(function(n){var a=document.createElement('a'),"
+         "m=document.createElement('small');a.href='#';a.className='net';a.dataset.s=n.s;a.textContent=n.s+' ';"
+         "m.textContent=n.r+' dBm'+(n.o?L.dataset.open:'');a.appendChild(m);L.appendChild(a)})}"
+         "show(d.scanning,!d.scanning&&!d.nets.length);if(d.scanning)setTimeout(poll,1500,'')"
+         "}).catch(function(){setTimeout(poll,3000,'')})}"
+         "g('rescan').onclick=function(){show(true,false);poll('?scan=1');return false};"
+         "if(!g('scanning').hidden)setTimeout(poll,1500,'')})();"
          // zone from the browser: IANA name (or alias), otherwise a whole-hour offset
          "(function(){var s=document.getElementById('tz');if(!s.dataset.auto)return;try{"
          "var z=Intl.DateTimeFormat().resolvedOptions().timeZone,i,o;"
@@ -2138,6 +2183,24 @@ static void handleRoot() {
   portalSeenAt = millis();
   if (web.hasArg("scan")) startScan();
   sendForm(requestLang(), nullptr, cfg, tzNeverChosen());
+}
+
+// Network list for the form's script: {"scanning":…,"nets":[{"s":ssid,"r":rssi,"o":open},…]}.
+// ?scan=1 starts a new scan first.
+static void handleNets() {
+  portalSeenAt = millis();
+  if (web.hasArg("scan")) startScan();
+  String j;
+  j.reserve(40 + netCount * 60);
+  j += scanRunning ? "{\"scanning\":true,\"nets\":[" : "{\"scanning\":false,\"nets\":[";
+  for (int i = 0; i < netCount; i++) {
+    if (i) j += ',';
+    j += "{\"s\":" + jsonString(nets[i].ssid.c_str()) + ",\"r\":" + nets[i].rssi + ",\"o\":" +
+         (nets[i].open ? "true}" : "false}");
+  }
+  j += "]}";
+  web.sendHeader("Cache-Control", "no-store");
+  web.send(200, "application/json", j);
 }
 
 static int codeIndex(const String &code, const char *const *codes, int n) {
@@ -2374,6 +2437,7 @@ static void portalStart() {
   web.on("/cancel", HTTP_POST, handleCancel);
   web.on("/factory", HTTP_POST, handleFactory);
   web.on("/bright", HTTP_GET, handleBright);
+  web.on("/nets", HTTP_GET, handleNets);
   web.addHandler(new CatchAll());   // after the other paths, redirects everything left
   web.begin();
   startScan();
@@ -2383,15 +2447,25 @@ static void portalStart() {
   Serial.println("Or type setup here in the console.");
 }
 
-static void scanService() {         // picks up the result of startScan()
+// Picks up the result of startScan(). The core reports a failure after 6 s (300 ms per channel
+// × 20), but with the hotspot on the radio keeps returning to its channel and the scan takes
+// about 8 s and then finishes fine, so we wait for the result ourselves. An empty or failed
+// scan (often the first one after the hotspot starts) is repeated.
+static void scanService() {
   if (!scanRunning) return;
   int n = WiFi.scanComplete();
-  if (n >= 0) {
-    collectScan(n);
-    scanRunning = false;
-  } else if (n == WIFI_SCAN_FAILED) {
-    scanRunning = false;
+  if (n < 0 && !scanStartFailed) {
+    if (millis() - scanStartedAt < SCAN_TIMEOUT_MS) return;
+    esp_wifi_scan_stop();
   }
+  if (n <= 0 && scanTriesLeft) {
+    scanTriesLeft--;
+    Serial.println("WiFi scan: nothing found, trying again");
+    scanBegin();
+    return;
+  }
+  collectScan(n > 0 ? n : 0);
+  scanRunning = false;
 }
 
 static void portalService() {
@@ -2418,15 +2492,7 @@ static void portalService() {
 
 static bool usbScanWanted;
 
-static void jsonPrint(const char *s) {  // prints a JSON string with escapes
-  Serial.print('"');
-  for (; *s; s++) {
-    if (*s == '"' || *s == '\\') Serial.print('\\');
-    if ((uint8_t)*s < 32) Serial.printf("\\u%04x", *s);
-    else                  Serial.print(*s);
-  }
-  Serial.print('"');
-}
+static void jsonPrint(const char *s) { Serial.print(jsonString(s)); }
 
 // Value of key in "k=v&k=v", URL-decoded; found says whether the key was there at all.
 static String urlValue(const char *q, const char *key, bool *found = nullptr) {

@@ -94,7 +94,9 @@ As long as the board is not set up, it starts an open Wi-Fi network
 **MICROHAMCLOCK-xxxx** at power-on (the name is on the display). Connect to it:
 your phone will usually open the setup page by itself, otherwise open
 `http://4.3.2.1`. In the form, choose the language, pick your Wi-Fi from
-the list, enter the password, your callsign and locator, check the time
+the list (it fills in by itself about 10 seconds after the hotspot starts,
+no need to reload the page; **Search for networks again** looks again),
+enter the password, your callsign and locator, check the time
 zone (preselected from your phone), adjust the screen saver and night if
 you like, and press **Save and restart**. The hotspot then turns off.
 
