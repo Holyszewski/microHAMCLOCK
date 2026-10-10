@@ -106,6 +106,12 @@ static const char *const MQTT_HOST   = "mqtt.pskreporter.info";
 static const uint16_t    MQTT_PORT   = 1883;
 static const char *const SOLAR_URL   = "https://www.hamqsl.com/solarxml.php";
 
+// Downloads from the data servers: a failed one is retried after FETCH_RETRY_MIN_MS, the wait doubling
+// up to FETCH_RETRY_MAX_MS. The first downloads after Wi-Fi comes up are spread over START_SPREAD_MS.
+static const uint32_t    FETCH_RETRY_MIN_MS = 120000UL;
+static const uint32_t    FETCH_RETRY_MAX_MS = 3600000UL;
+static const uint32_t    START_SPREAD_MS    = 60000UL;
+
 // Besides the entered callsign, spots are also subscribed for its base form with these suffixes
 // (OK2MTB, OK2MTB/P, OK2MTB/M), so it does not matter whether you operate from home or a hilltop.
 static const char *const CALL_SUFFIXES[] = {"P", "M"};
@@ -113,7 +119,7 @@ static const char *const CALL_SUFFIXES[] = {"P", "M"};
 // foF2 and MUF(3000) from an ionosonde (GIRO data via KC2G). The nearest ionosonde
 // to the locator with a fresh measurement is used, or the one the user entered by code (e.g. PQ052 = Pruhonice).
 static const char *const IONO_URL       = "https://prop.kc2g.com/api/stations.json";
-static const uint16_t    IONO_REFRESH_MIN = 10;   // the ionosonde measures every 5 minutes
+static const uint16_t    IONO_REFRESH_MIN = 15;   // the ionosonde measures every 5 minutes; 15 min keeps the load down
 static const uint16_t    IONO_MAX_AGE_MIN = 90;   // older measurements are no longer shown
 static const uint16_t    IONO_MAX_KM      = 1500; // a more distant ionosonde says little about local conditions
 static const uint16_t    IONO_STICKY_KM   = 300;  // the current ionosonde stays unless it is this much farther than the nearest
@@ -654,6 +660,13 @@ static void expireSpots() {
 // Topics look like pskr/filter/v2/band/mode/sender/receiver/sloc/rloc/sdxcc/rdxcc,
 // a slash in a callsign is replaced by a dot in the topic.
 
+// A delay with a random spread of ±10 %, so boards that started together (after a power cut, say)
+// do not all ask the data servers or the MQTT broker at the same moment.
+static uint32_t jittered(uint32_t ms) {
+  uint32_t spread = ms / 5;
+  return ms - spread / 2 + esp_random() % (spread + 1);
+}
+
 enum MqttState { MS_IDLE, MS_WAIT_CONNACK, MS_WAIT_SUBACK, MS_READY };
 static WiFiClient mqttNet;
 static MqttState mqttState = MS_IDLE;
@@ -697,7 +710,7 @@ static void mqttDrop(const char *why) {
   if (mqttState != MS_IDLE && !quietLog) Serial.printf("MQTT: disconnected (%s)\n", why);
   mqttNet.stop();
   mqttSetState(MS_IDLE);
-  mqttNextTry = millis() + mqttBackoff;
+  mqttNextTry = millis() + jittered(mqttBackoff);
   mqttBackoff = min<uint32_t>(mqttBackoff * 2, 120000);
 }
 
@@ -908,6 +921,7 @@ static bool httpsGet(const char *url, const char *what, String &out) {
   tls.setInsecure();
   HTTPClient http;
   http.setTimeout(10000);
+  http.setUserAgent(String("microHAMCLOCK/") + FW_VERSION + " (https://github.com/Holyszewski/microHAMCLOCK)");
   if (!http.begin(tls, url)) return false;
   int code = http.GET();
   if (code == 200) out = http.getString();
@@ -1138,6 +1152,14 @@ static void onWifiDisconnect(WiFiEvent_t, WiFiEventInfo_t info) {
   wifiFailSeen = f;
 }
 
+// Wait after the n-th failed download in a row: 2 min, then longer each time, up to an hour, so a server
+// that is down is not asked every 2 minutes by every board.
+static uint32_t retryDelay(uint8_t fails) {
+  uint32_t ms = FETCH_RETRY_MIN_MS;
+  for (uint8_t i = 1; i < fails && ms < FETCH_RETRY_MAX_MS; i++) ms *= 2;
+  return jittered(min<uint32_t>(ms, FETCH_RETRY_MAX_MS));
+}
+
 static void netTask(void *) {
   WiFi.onEvent(onWifiDisconnect, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFi.mode(WIFI_STA);
@@ -1146,6 +1168,7 @@ static void netTask(void *) {
   WiFi.begin(cfg.ssid, cfg.pass[0] ? cfg.pass : nullptr);
   bool ntpStarted = false, wasUp = false;
   uint32_t nextSolar = 0, nextIono = 0, nextExpire = 0, lastBegin = millis(), downSince = millis();
+  uint8_t solarFails = 0, ionoFails = 0;
 
   for (;;) {
     uint32_t now = millis();
@@ -1153,6 +1176,10 @@ static void netTask(void *) {
     if (up != wasUp) {
       wasUp = up;
       if (!up) downSince = now;
+      else {                          // the first downloads come soon, but not all at the same moment
+        nextSolar = now + esp_random() % START_SPREAD_MS;
+        nextIono = now + esp_random() % START_SPREAD_MS;
+      }
       if (!quietLog) {
         if (up) Serial.printf("WiFi: connected, IP %s\n", WiFi.localIP().toString().c_str());
         else    Serial.println("WiFi: disconnected");
@@ -1189,11 +1216,13 @@ static void netTask(void *) {
 
     if ((int32_t)(now - nextSolar) >= 0) {
       bool ok = fetchSolar();
-      nextSolar = millis() + (ok ? SOLAR_REFRESH_MIN * 60000UL : 120000UL);
+      solarFails = ok ? 0 : min<uint8_t>(solarFails + 1, 16);
+      nextSolar = millis() + (ok ? jittered(SOLAR_REFRESH_MIN * 60000UL) : retryDelay(solarFails));
     }
     if (timeValid() && (int32_t)(now - nextIono) >= 0) {   // without time a fresh measurement cannot be recognized
       bool ok = fetchIono();
-      nextIono = millis() + (ok ? IONO_REFRESH_MIN * 60000UL : 120000UL);
+      ionoFails = ok ? 0 : min<uint8_t>(ionoFails + 1, 16);
+      nextIono = millis() + (ok ? jittered(IONO_REFRESH_MIN * 60000UL) : retryDelay(ionoFails));
     }
     if ((int32_t)(now - nextExpire) >= 0) {
       expireSpots();

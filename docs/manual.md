@@ -304,7 +304,7 @@ leave it first.
   has a fresh measurement and is within 1500 km of your locator (in
   Czechia usually Průhonice, PQ052, run by the Institute of Atmospheric
   Physics of the Czech Academy of Sciences). The data comes from
-  `https://prop.kc2g.com/api/stations.json` and is refreshed every 10
+  `https://prop.kc2g.com/api/stations.json` and is refreshed about every 15
   minutes. A measurement older than 90 minutes shows as `--`. The code of
   the station in use is on the status screen; you can enter a different
   station in Advanced. Fresh data is available in Europe, the Americas,
@@ -312,7 +312,11 @@ leave it first.
 - **NVIS** – the recommended band is the highest band (160–20 m) whose
   lower edge lies below foF2 reduced by the margin from Advanced.
 - **Propagation** – XML from N0NBH, `https://www.hamqsl.com/solarxml.php`,
-  refreshed every 30 minutes.
+  refreshed about every 30 minutes.
+- **Data servers** – if a download fails, the board retries after 2 minutes,
+  and each further failure doubles the wait, up to an hour. The board
+  identifies itself to the servers as `microHAMCLOCK/<version>` with the
+  project's address.
 - **Time** – NTP `ntp.ufe.cz` (the Institute of Photonics and Electronics
   of the Czech Academy of Sciences, which maintains the Czech national time
   standard). `tik.cesnet.cz` and `pool.ntp.org` serve as backups. The board

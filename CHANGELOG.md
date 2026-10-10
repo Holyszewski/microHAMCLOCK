@@ -5,6 +5,21 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
+## Unreleased
+
+- Changed: the ionosonde data (KC2G) is downloaded every 15 minutes, not
+  every 10, which halves its load on the server; the data stays well inside
+  the 90-minute limit.
+- Changed: a failed download (propagation or ionosonde) is retried after
+  2 minutes and each further failure doubles the wait, up to an hour. Before,
+  every board retried every 2 minutes, so an outage was hit by all of them.
+- Changed: refresh times and MQTT reconnects have a random spread of ±10 %,
+  and the first downloads after Wi-Fi comes up fall within a minute, so boards
+  that start together (after a power cut, say) do not all ask at once.
+- Changed: the data downloads identify the board and the project in the
+  User-Agent header (`microHAMCLOCK/<version>`), so the servers can tell who
+  is asking and get in touch.
+
 ## 0.10.1 – 2026-10-10
 
 - Fix: the setup hotspot page listed no Wi-Fi networks. With the hotspot
