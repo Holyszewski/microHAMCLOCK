@@ -95,6 +95,9 @@ TR(S_POWER_OFF,        "SHUTDOWN")
 TR(S_BATTERY_FLAT,     "LOW BATT")
 TR(S_POWER_RST,        "PRESS RST TO START")
 
+// ---- OLED: factory reset ----
+TR(S_FACTORY_RESET,    "FACTORY RESET")
+
 // ---- web page (UTF-8) ----
 TR(W_TITLE,            "microHAMCLOCK: setup")
 TR(W_VERSION,          "version")
@@ -154,6 +157,9 @@ TR(W_MAPS_HINT,        "A ticked country is added to the map views switched by a
 TR(W_BOARD,            "Heltec board version")
 TR(W_BOARD_AUTO,       "detect automatically")
 TR(W_BOARD_HINT,       "The version is printed on the board. It only matters for measuring the battery voltage, which V3.2 switches on differently than V3 and V3.1.")
+TR(W_FACTORY,          "Factory reset")
+TR(W_FACTORY_HINT,     "Erases all settings, Wi-Fi included, and restarts in setup mode like a new board. Handy before you give the board to someone else.")
+TR(W_FACTORY_ASK,      "Erase all settings, Wi-Fi included? This cannot be undone.")
 TR(W_ERR_SAVER,        "The screen saver time must be 0 to 240 minutes.")
 TR(W_ERR_LIFE_DAYS,    "Game of Life can run 1 to 30 days before the display turns off.")
 TR(W_ERR_IONO,         "An ionosonde code has at most 7 letters, digits or underscores (for example PQ052).")
@@ -167,3 +173,4 @@ TR(W_ERR_CALL,         "A callsign has 3 to 11 characters: letters, digits and s
 TR(W_ERR_LOC,          "A locator looks like JO70 or JO70va.")
 TR(W_SAVED,            "Saved. microHAMCLOCK is restarting and will connect to <b>%s</b>. The hotspot turns off, you can disconnect.")
 TR(W_NOCHANGE,         "Nothing changed, microHAMCLOCK is returning to normal operation.")
+TR(W_FACTORY_DONE,     "All settings were erased. microHAMCLOCK is restarting in setup mode, like a new board.")

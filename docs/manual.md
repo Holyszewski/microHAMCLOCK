@@ -36,14 +36,23 @@ master; a missing translation falls back to English). To add a language:
 ## Flashing
 
 The easiest way is the web installer: open it in Chrome, Edge or Opera on a
-computer, connect the board with a USB-C cable and press **Install**. On an
-update your settings are kept unless you choose to erase the device.
+computer, connect the board with a USB-C cable and press **Install**.
 
-To flash by hand, download `heltec_v3_microhamclock-merged.bin` from the
-[latest release](../../../releases/latest) and flash it with any ESP32-S3
+An update keeps your settings, with the installer and by hand, unless you
+choose to erase the device (the installer asks). Erasing, or a factory reset
+(see below), returns the board to the state without settings.
+
+Boards that ran a version before 0.10.0 have to be set up once more after
+updating to it: the settings moved to another place in the flash memory, so
+that installing a new version doesn't overwrite them any more.
+
+To flash by hand, download
+[`heltec_v3_microhamclock-merged.bin`](../../../releases/latest/download/heltec_v3_microhamclock-merged.bin)
+(this link always gives the latest release; older versions are on the
+[releases page](../../../releases)) and flash it with any ESP32-S3
 flasher, for example the MeshCore web flasher. microHAMCLOCK is not in its list;
 choose a custom file from your computer. The file is written from address
-0x0, with the flash erased. From the command line:
+0x0. From the command line:
 
 ```
 esptool.py --chip esp32s3 write_flash 0x0 heltec_v3_microhamclock-merged.bin
@@ -213,6 +222,12 @@ round. The `status` command prints the version in use and the battery
 voltage. The voltage means little on USB or without a cell: a board
 without a cell reads about 3.2 V.
 
+**Factory reset**, the red button at the very bottom of **Advanced**,
+erases all settings, the Wi-Fi network and password included, and restarts
+the board in setup mode, like a new one. The page asks first. Handy before
+you give the board to someone else. The console command `factory` does the
+same.
+
 Other console commands:
 
 | command    | what it does                                                  |
@@ -221,6 +236,7 @@ Other console commands:
 | `snapshot` | prints the display contents; `python tools/snapshot.py COM4 screen.png` turns them into a PNG (formerly `snimek`, which still works) |
 | `blink`    | switches to the propagation screen and demonstrates the flash, as if new data had arrived |
 | `off`      | powers the board off, like the long press on the status screen (see Controls) |
+| `factory`  | factory reset: erases all settings, Wi-Fi included, and restarts in setup mode. It asks first; type `yes` to confirm |
 | `saver`    | turns the screen saver on right away: `saver` the one you set, `saver off`, `saver life` or `saver dim` a given one. The settings don't change; the button, or a spot when spots may wake the display, ends it as usual. Handy for trying the savers and the LED flash on a spot without waiting |
 
 ## Screens

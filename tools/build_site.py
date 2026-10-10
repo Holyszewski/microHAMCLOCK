@@ -9,7 +9,9 @@ Usage:
 
 The site is web/index.html plus manifest.json for ESP Web Tools, the merged
 firmware from firmware/ (made at a release, see CLAUDE.md) and the README
-screen images. The version comes from the first "## X.Y.Z" heading in
+screen images. The merged image must end before NVS (partitions.csv), so an
+update keeps the settings; the build refuses an image that reaches into it.
+The version comes from the first "## X.Y.Z" heading in
 CHANGELOG.md that is a real version. Publish the contents of site/ on GitHub
 Pages; ESP Web Tools needs the firmware on the same site (CORS).
 
@@ -48,6 +50,7 @@ def repo_url():
         return "#"
     if url.startswith("git@github.com:"):
         url = "https://github.com/" + url[len("git@github.com:"):]
+    url = re.sub(r"^(https?://)[^/@]+@", r"\1", url)  # drop a user name ("https://user@github.com/…")
     return url[:-4] if url.endswith(".git") else url
 
 
@@ -62,6 +65,8 @@ def main():
     if not os.path.exists(firmware):
         sys.exit("build_site: %s is missing, make a release build first (see CLAUDE.md)" % firmware)
     version = release_version()
+    from release import check_nvs   # tools/ is on sys.path when this script runs
+    check_nvs(firmware)
 
     shutil.rmtree(SITE, ignore_errors=True)
     os.makedirs(os.path.join(SITE, "img"))

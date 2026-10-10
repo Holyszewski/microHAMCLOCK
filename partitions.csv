@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+#
+# Flash layout for the 8 MB Heltec V3: the Arduino default_8MB.csv with NVS moved from 0x9000 to the end.
+# The merged release image runs from 0x0 to the end of the application, so with NVS behind it an
+# update keeps the settings; a full erase still clears them. 0x9000-0xe000 is left unused.
+# Name,   Type, SubType,  Offset,   Size
+otadata,  data, ota,      0xe000,   0x2000
+app0,     app,  ota_0,    0x10000,  0x330000
+app1,     app,  ota_1,    0x340000, 0x330000
+spiffs,   data, spiffs,   0x670000, 0x170000
+nvs,      data, nvs,      0x7E0000, 0x10000
+coredump, data, coredump, 0x7F0000, 0x10000

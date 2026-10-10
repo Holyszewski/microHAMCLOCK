@@ -85,6 +85,7 @@ TR(S_UPTIME,           "BEZI %luH %02luM")
 TR(S_POWER_OFF,        "VYPINANI")
 TR(S_BATTERY_FLAT,     "VYBITA")
 TR(S_POWER_RST,        "ZAPNE TLACITKO RST")
+TR(S_FACTORY_RESET,    "TOVARNI NASTAVENI")
 
 // ---- web page (UTF-8) ----
 TR(W_TITLE,            "microHAMCLOCK: nastavení")
@@ -145,6 +146,9 @@ TR(W_MAPS_HINT,        "Zaškrtnutá země přibude mezi pohledy mapy přepínan
 TR(W_BOARD,            "Verze desky Heltec")
 TR(W_BOARD_AUTO,       "rozpoznat automaticky")
 TR(W_BOARD_HINT,       "Verze je natištěná na desce. Záleží na ní jen měření napětí baterie, které V3.2 zapíná jinak než V3 a V3.1.")
+TR(W_FACTORY,          "Tovární nastavení")
+TR(W_FACTORY_HINT,     "Smaže všechna nastavení včetně Wi-Fi a restartuje do režimu nastavení jako nová deska. Hodí se, než desku předáš někomu jinému.")
+TR(W_FACTORY_ASK,      "Smazat všechna nastavení včetně Wi-Fi? Nejde to vrátit.")
 TR(W_ERR_SAVER,        "Čas spořiče musí být 0 až 240 minut.")
 TR(W_ERR_LIFE_DAYS,    "Game of Life může běžet 1 až 30 dní, než se displej vypne.")
 TR(W_ERR_IONO,         "Kód ionosondy má nejvýš 7 písmen, číslic nebo podtržítek (např. PQ052).")
@@ -158,3 +162,4 @@ TR(W_ERR_CALL,         "Značka má 3 až 11 znaků: písmena, číslice a lomí
 TR(W_ERR_LOC,          "Lokátor vypadá jako JO70 nebo JO70va.")
 TR(W_SAVED,            "Uloženo. microHAMCLOCK se restartuje a připojí k síti <b>%s</b>. Hotspot se vypne, můžeš se odpojit.")
 TR(W_NOCHANGE,         "Nic se nezměnilo, microHAMCLOCK se vrací do běžného provozu.")
+TR(W_FACTORY_DONE,     "Všechna nastavení jsou smazaná. microHAMCLOCK se restartuje do režimu nastavení jako nová deska.")

@@ -86,6 +86,7 @@ TR(S_UPTIME,           "SEIT %luH %02luM")
 TR(S_POWER_OFF,        "SCHALTE AB")
 TR(S_BATTERY_FLAT,     "AKKU LEER")
 TR(S_POWER_RST,        "START MIT RST")
+TR(S_FACTORY_RESET,    "WERKSEINSTELLUNG")
 
 // ---- web page (UTF-8) ----
 TR(W_TITLE,            "microHAMCLOCK: Einstellungen")
@@ -146,6 +147,9 @@ TR(W_MAPS_HINT,        "Ein angehaktes Land kommt zu den Kartenansichten hinzu, 
 TR(W_BOARD,            "Version der Heltec-Platine")
 TR(W_BOARD_AUTO,       "automatisch erkennen")
 TR(W_BOARD_HINT,       "Die Version steht auf der Platine. Sie zählt nur für die Messung der Akkuspannung, die V3.2 anders einschaltet als V3 und V3.1.")
+TR(W_FACTORY,          "Auf Werkseinstellungen zurücksetzen")
+TR(W_FACTORY_HINT,     "Löscht alle Einstellungen samt WLAN und startet im Einrichtungsmodus neu, wie eine neue Platine. Praktisch, bevor du die Platine weitergibst.")
+TR(W_FACTORY_ASK,      "Alle Einstellungen samt WLAN löschen? Das lässt sich nicht rückgängig machen.")
 TR(W_ERR_SAVER,        "Die Zeit des Bildschirmschoners muss 0 bis 240 Minuten betragen.")
 TR(W_ERR_LIFE_DAYS,    "Game of Life kann 1 bis 30 Tage laufen, bevor das Display ausgeht.")
 TR(W_ERR_IONO,         "Ein Ionosonden-Code hat höchstens 7 Buchstaben, Ziffern oder Unterstriche (zum Beispiel JR055).")
@@ -159,3 +163,4 @@ TR(W_ERR_CALL,         "Ein Rufzeichen hat 3 bis 11 Zeichen: Buchstaben, Ziffern
 TR(W_ERR_LOC,          "Ein Locator sieht aus wie JO70 oder JO70va.")
 TR(W_SAVED,            "Gespeichert. microHAMCLOCK startet neu und verbindet sich mit <b>%s</b>. Der Hotspot geht aus, du kannst die Verbindung trennen.")
 TR(W_NOCHANGE,         "Nichts geändert, microHAMCLOCK kehrt zum normalen Betrieb zurück.")
+TR(W_FACTORY_DONE,     "Alle Einstellungen wurden gelöscht. microHAMCLOCK startet im Einrichtungsmodus neu, wie eine neue Platine.")

@@ -75,7 +75,8 @@ own: the board talks straight to public ham radio data feeds over Wi-Fi.
 
    <details><summary>Prefer to flash by hand?</summary>
 
-   Download `heltec_v3_microhamclock-merged.bin` from the [latest release](../../releases/latest) and
+   Download [`heltec_v3_microhamclock-merged.bin`](../../releases/latest/download/heltec_v3_microhamclock-merged.bin)
+   (always the latest release; older ones are on the [releases page](../../releases)) and
    write it at address `0x0`, for example with [esptool-js](https://espressif.github.io/esptool-js/)
    or from the command line:
    ```

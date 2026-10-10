@@ -44,6 +44,7 @@
 #include <WebServer.h>
 #include <WiFiUdp.h>
 #include <Preferences.h>
+#include <nvs_flash.h>
 #include <time.h>
 #include <math.h>
 #include <esp_sntp.h>
@@ -1305,6 +1306,25 @@ static void powerOff(bool flat, bool show) {
   esp_deep_sleep_start();
 }
 
+// Factory reset: erases the whole NVS partition (our settings and the Wi-Fi driver's stored network)
+// and restarts, so the board comes up in setup mode like a new one.
+static void factoryReset() {
+  memset(fb, 0, sizeof fb);
+  drawTextCenter(tr(S_FACTORY_RESET), 28);
+  oledFlush();
+  Serial.println("Factory reset: erasing all settings, restarting...");
+  Serial.flush();
+  if (netTaskHandle) vTaskSuspend(netTaskHandle);
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+  prefs.end();
+  esp_err_t err = nvs_flash_erase();
+  if (err != ESP_OK) Serial.printf("Factory reset: erase failed (%s)\n", esp_err_to_name(err));
+  Serial.flush();
+  delay(800);
+  ESP.restart();
+}
+
 // Measures the battery now and then. With BAT_AUTO_OFF a flat cell powers the board off.
 static void batteryService(uint32_t now) {
   static uint32_t lastAt;
@@ -1742,6 +1762,18 @@ static String htmlEscape(const char *s) {
   return o;
 }
 
+// Text inside a single-quoted JavaScript string in an HTML attribute (onclick="…('…')").
+static String jsQuote(const char *s) {
+  String o;
+  for (; *s; s++) {
+    if (*s == '\\' || *s == '\'') o += '\\';
+    if (*s == '"') o += "&quot;";
+    else if (*s == '&') o += "&amp;";
+    else o += *s;
+  }
+  return o;
+}
+
 static void startScan() {
   if (scanRunning) return;
   WiFi.scanNetworks(true);          // asynchronous, scanService() picks up the result
@@ -1780,7 +1812,7 @@ static const char PORTAL_STYLE[] PROGMEM =
   ".net{display:block;padding:8px 10px;margin:4px 0;border-radius:6px;background:#222;color:#eee;text-decoration:none}"
   ".net small,small{color:#999}a{color:#7ab4ff}.err{background:#5a1d1d;padding:10px;border-radius:6px}"
   "button{margin-top:20px;width:100%;padding:12px;font-size:1em;border:0;border-radius:6px;background:#2b7de9;color:#fff}"
-  "button.sec{background:#444;margin-top:10px}"
+  "button.sec{background:#444;margin-top:10px}button.danger{background:#a33;margin-top:24px}"
   "details{margin-top:24px;border-top:1px solid #333;padding-top:8px}summary{cursor:pointer;font-weight:600;padding:8px 0}"
   "input[type=range]{width:100%}output{float:right;font-weight:400;color:#999}"
   ".sub{margin-left:28px}.off{opacity:.4;pointer-events:none}";
@@ -2052,6 +2084,12 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
   }
   b += "</select><small>";
   b += tr(W_BOARD_HINT, lang);
+  b += "</small><button type=submit class=danger formaction=/factory formnovalidate onclick=\"return confirm('";
+  b += jsQuote(tr(W_FACTORY_ASK, lang));
+  b += "')\">";
+  b += tr(W_FACTORY, lang);
+  b += "</button><small>";
+  b += tr(W_FACTORY_HINT, lang);
   b += "</small></details>";
 
   b += "<button type=submit>";
@@ -2221,6 +2259,16 @@ static void handleBright() {
   web.send(204);
 }
 
+static bool factoryPending;         // the restart after the reply erases the settings first
+
+static void handleFactory() {
+  Lang lang = requestLang();
+  sendPage(lang, String("<p>") + tr(W_FACTORY_DONE, lang) + "</p>");
+  Serial.println("Hotspot: factory reset");
+  factoryPending = true;
+  restartSoon(1500);
+}
+
 static void handleCancel() {
   Lang lang = requestLang();
   sendPage(lang, String("<p>") + tr(W_NOCHANGE, lang) + "</p>");
@@ -2324,6 +2372,7 @@ static void portalStart() {
   web.on("/", HTTP_GET, handleRoot);
   web.on("/save", HTTP_POST, handleSave);
   web.on("/cancel", HTTP_POST, handleCancel);
+  web.on("/factory", HTTP_POST, handleFactory);
   web.on("/bright", HTTP_GET, handleBright);
   web.addHandler(new CatchAll());   // after the other paths, redirects everything left
   web.begin();
@@ -2531,6 +2580,8 @@ static void saverCommand(char *arg) {
                 NAME[mode >= 0 ? mode : cfg.saverMode]);
 }
 
+static bool factoryAsked;           // "factory" was typed, the next line confirms it
+
 // Commands are in English; the original Czech ones (stav, snimek) still work.
 static void serialService() {
   if (!readLine(wiz == WZ_PASS)) return;
@@ -2543,15 +2594,26 @@ static void serialService() {
     return;
   }
   trim(line);
+  if (factoryAsked) {
+    factoryAsked = false;
+    if (!strcasecmp(line, "yes")) factoryReset();
+    Serial.println("Factory reset cancelled, nothing was erased.");
+    return;
+  }
   if (!strcasecmp(line, "setup"))                                    wizStart();
   else if (!strcasecmp(line, "status") || !strcasecmp(line, "stav")) printStatus();
   else if (!strcasecmp(line, "snapshot") || !strcasecmp(line, "snimek")) printScreenshot();
   else if (!strcasecmp(line, "blink"))                               blinkTestAt = (millis() + 1000) | 1;
   else if (!strncasecmp(line, "saver", 5) && (!line[5] || line[5] == ' ')) saverCommand(line + 5);
   else if (!strcasecmp(line, "off"))                                 powerOff(false, true);
+  else if (!strcasecmp(line, "factory")) {
+    factoryAsked = true;
+    Serial.println("Factory reset erases all settings, Wi-Fi included, and restarts in setup mode.");
+    Serial.println("Type yes to erase everything, anything else cancels:");
+  }
   else if (line[0]) Serial.println("Commands: setup = settings, status = what is going on, snapshot = screen dump, "
                                    "blink = test the propagation screen blink, saver [off|life|dim] = screen saver now, "
-                                   "off = power off (RST starts again)");
+                                   "off = power off (RST starts again), factory = erase all settings");
 }
 
 // ============================ SCREENS ============================
@@ -3236,7 +3298,10 @@ void loop() {
   usbService();
   handleButton(now);
   if (portalMode) portalService();
-  if (restartPending && (int32_t)(now - restartAt) >= 0) ESP.restart();
+  if (restartPending && (int32_t)(now - restartAt) >= 0) {
+    if (factoryPending) factoryReset();
+    ESP.restart();
+  }
   saverService(now);
   batteryService(now);
 

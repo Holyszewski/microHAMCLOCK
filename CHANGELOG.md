@@ -5,8 +5,22 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
-## Unreleased
+## 0.10.0 – 2026-10-10
 
+- README and the manual link straight to the firmware of the latest
+  release, and `tools/release.py` builds the release binaries and
+  publishes the GitHub Release.
+- Fix: the web installer page linked to the repository with the git
+  user name in the address.
+- Fix: installing a new version with the web installer or a flasher
+  erased the settings, even without choosing to erase the device,
+  because the firmware image also covered the settings area. The
+  settings now live at the end of the flash memory, out of the image's
+  reach. Boards set up before have to be set up once more after this
+  update.
+- Factory reset: a button at the bottom of Advanced on the setup page
+  and the `factory` console command erase all settings, Wi-Fi included,
+  and restart in setup mode.
 - Power off: a long press on the status screen or the `off` console
   command turns the display, Wi-Fi and the LoRa radio off and puts the
   board into deep sleep; the RST button starts it again. For running on
