@@ -15,6 +15,10 @@ releases are listed in the Unreleased section.
   Holyszewski, OK2MTB. Source files carry an SPDX header.
 - Contributor License Agreement (`CLA.md`), `CONTRIBUTING.md` and a
   pull request template.
+- The Game of Life screen saver can turn the display off after a set
+  number of days (Advanced on the web: off by default, 2 days when
+  ticked, 1–30). Game of Life stays the saver, waking works as before.
+  `status` shows it.
 
 ## 0.9.1 – 2026-10-10
 

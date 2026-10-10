@@ -85,6 +85,8 @@ static const uint16_t SPOT_WAKE_MAX_AGE_MIN = 15;  // older (late-reported) spot
 static const uint16_t LIFE_STEP_MS       = 120;    // Game of Life speed in the saver
 static const uint16_t DIM_SHIFT_S        = 60;     // "dim and shift" saver: shift the image every minute
 static const uint16_t SPOT_LED_MS        = 500;    // one blink on a spot wake-up
+static const uint8_t  DEFAULT_LIFE_DAYS  = 2;      // Game of Life saver: display off after this many days (if enabled)
+static const uint8_t  MAX_LIFE_DAYS      = 30;     // keeps the millis() difference far below its 49-day wrap
 
 // Local time: NTP sends only UTC, the zone is picked in settings (see tz.h).
 // A board configured before 0.4.0 had no zone stored and ran on CET/CEST.
@@ -330,6 +332,8 @@ struct Config {
   uint8_t saverMode;                // SaverMode
   bool wakeOnSpot;                  // new spot = activity (wakes the display)
   bool ledOnSpotWake;               // blink the LED only on a spot wake-up
+  bool lifeOff;                     // the Game of Life saver turns the display off after lifeDays
+  uint8_t lifeDays;                 // days of Game of Life before the display turns off
   bool rotate;                      // automatic screen rotation
   uint8_t rotateSec;                // seconds per screen in rotation
   uint8_t nightFrom, nightTo;       // night hours (local time); equal = no night
@@ -377,6 +381,8 @@ static void loadConfig() {
   cfg.saverMode = prefs.getUChar("svmode", SV_OFF) % SV_MODE_COUNT;
   cfg.wakeOnSpot = prefs.getBool("svspot", true);
   cfg.ledOnSpotWake = prefs.getBool("svled", true);
+  cfg.lifeOff = prefs.getBool("lfoff", false);
+  cfg.lifeDays = constrain(prefs.getUChar("lfdays", DEFAULT_LIFE_DAYS), 1, MAX_LIFE_DAYS);
   cfg.rotate = prefs.getBool("rotate", DEFAULT_ROTATE);
   cfg.rotateSec = constrain(prefs.getUChar("rotsec", DEFAULT_ROTATE_S), MIN_ROTATE_S, MAX_ROTATE_S);
   cfg.nightFrom = prefs.getUChar("nfrom", DEFAULT_NIGHT_FROM) % 24;
@@ -399,6 +405,8 @@ static void saveConfig(const Config &c) {
   prefs.putUChar("svmode", c.saverMode);
   prefs.putBool("svspot", c.wakeOnSpot);
   prefs.putBool("svled", c.ledOnSpotWake);
+  prefs.putBool("lfoff", c.lifeOff);
+  prefs.putUChar("lfdays", c.lifeDays);
   prefs.putBool("rotate", c.rotate);
   prefs.putUChar("rotsec", c.rotateSec);
   prefs.putUChar("nfrom", c.nightFrom);
@@ -1447,6 +1455,8 @@ static void printStatus() {
   else
     Serial.println("Screen saver: never");
   Serial.printf("Spot wake LED: %s\n", cfg.ledOnSpotWake ? "on" : "off");
+  if (cfg.lifeOff) Serial.printf("Game of Life saver: display off after %u days\n", cfg.lifeDays);
+  else             Serial.println("Game of Life saver: runs until woken");
   if (cfg.nightFrom != cfg.nightTo)
     Serial.printf("Night: %u-%u, %s, now %s\n", cfg.nightFrom, cfg.nightTo, NIGHT_CODE[cfg.nightMode],
                   isNight() ? "night" : "day");
@@ -1600,7 +1610,7 @@ static const char PORTAL_STYLE[] PROGMEM =
   "button.sec{background:#444;margin-top:10px}"
   "details{margin-top:24px;border-top:1px solid #333;padding-top:8px}summary{cursor:pointer;font-weight:600;padding:8px 0}"
   "input[type=range]{width:100%}output{float:right;font-weight:400;color:#999}"
-  "label.sub{margin-left:28px}label.off{opacity:.4;pointer-events:none}";
+  ".sub{margin-left:28px}.off{opacity:.4;pointer-events:none}";
 
 // Page in language lang (may differ from the stored one: the user is just choosing it).
 static void sendPage(Lang lang, const String &body) {
@@ -1776,7 +1786,7 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
 
   // advanced: display brightness; collapsed while everything is at defaults
   bool custom = memcmp(v.bright, BRIGHT_DEFAULT, sizeof BRIGHT_DEFAULT) != 0 || v.nvisMargin || !v.nvis60 || v.iono[0] ||
-                v.rotateSec != DEFAULT_ROTATE_S;
+                v.rotateSec != DEFAULT_ROTATE_S || v.lifeOff || v.lifeDays != DEFAULT_LIFE_DAYS;
   b += custom ? "<details open><summary>" : "<details><summary>";
   b += tr(W_ADVANCED, lang);
   b += "</summary><label for=rotsec>";
@@ -1809,6 +1819,19 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
   }
   b += "<small>";
   b += tr(W_BRIGHT_HINT, lang);
+  // Game of Life saver: display off after some days; the days are greyed out while unticked (but still sent)
+  b += "</small><label class=chk><input type=checkbox id=lfoff name=lfoff value=1";
+  if (v.lifeOff) b += " checked";
+  b += "> ";
+  b += tr(W_LIFE_OFF, lang);
+  b += "</label><div class=sub id=lfd><label for=lfdays>";
+  b += tr(W_LIFE_DAYS, lang);
+  b += "</label><input type=number id=lfdays name=lfdays min=1 max=";
+  b += (int)MAX_LIFE_DAYS;
+  b += " value=";
+  b += (int)v.lifeDays;
+  b += "></div><small>";
+  b += tr(W_LIFE_HINT, lang);
   b += "</small><label for=nvismg>";
   b += tr(W_NVIS_MARGIN, lang);
   b += "</label><input type=number id=nvismg name=nvismg min=0 max=";
@@ -1852,6 +1875,8 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
          "}catch(e){}})();"
          // LED on spot wake-up only makes sense with spot wake-up enabled
          "(function(){var w=document.getElementById('svspot'),l=document.getElementById('svledl');"
+         "function u(){l.classList.toggle('off',!w.checked)}w.onchange=u;u()})();"
+         "(function(){var w=document.getElementById('lfoff'),l=document.getElementById('lfd');"
          "function u(){l.classList.toggle('off',!w.checked)}w.onchange=u;u()})();"
          // brightness: number next to the slider and preview on the display (at most one request per 150 ms)
          "document.querySelectorAll('.br').forEach(function(r){var t;r.oninput=function(){"
@@ -1928,6 +1953,13 @@ static void handleSave() {
   if (mode >= 0) d.saverMode = mode;
   d.wakeOnSpot = web.hasArg("svspot");
   d.ledOnSpotWake = web.hasArg("svled");
+  d.lifeOff = web.hasArg("lfoff");
+  String lfdays = web.arg("lfdays");
+  lfdays.trim();
+  long days = lfdays.toInt();
+  bool daysOk = lfdays.length() && days >= 1 && days <= MAX_LIFE_DAYS;
+  if (daysOk) d.lifeDays = days;
+  if (!d.lifeOff) daysOk = true;      // ignored while unticked, the stored number stays
   d.rotate = web.hasArg("rotate");
   long rotsec = web.arg("rotsec").toInt();
   if (rotsec >= MIN_ROTATE_S && rotsec <= MAX_ROTATE_S) d.rotateSec = rotsec;
@@ -1954,7 +1986,7 @@ static void handleSave() {
 
   int err = checkBasic(d, web.arg("ssid"), web.arg("pass"), web.hasArg("open"), web.arg("call"), web.arg("loc"),
                        web.arg("tz"));
-  if (err < 0) err = !minOk ? W_ERR_SAVER : !ionoOk ? W_ERR_IONO : -1;
+  if (err < 0) err = !minOk ? W_ERR_SAVER : !daysOk ? W_ERR_LIFE_DAYS : !ionoOk ? W_ERR_IONO : -1;
   if (err >= 0) {
     sendForm(lang, tr(StrId(err), lang), d, false);
     return;
@@ -2920,12 +2952,22 @@ static SaverMode saverModeNow() {
 }
 
 static void showFrame(uint32_t now) {
+  static bool lifeRunning, lifeOver;  // Game of Life saver: since when it runs, and whether lifeDays are over
+  static uint32_t lifeSince;
   SaverMode mode = saverModeNow();
-  if (asleep && mode == SV_OFF) {
+  bool life = asleep && mode == SV_LIFE;
+  if (!life) lifeOver = false;
+  else if (!lifeRunning) lifeSince = now;
+  else if (cfg.lifeOff && !lifeOver && now - lifeSince >= cfg.lifeDays * 86400000UL) {
+    lifeOver = true;
+    Serial.printf("Screen saver: Game of Life ran %u days, display off\n", cfg.lifeDays);
+  }
+  lifeRunning = life;
+  if (asleep && (mode == SV_OFF || lifeOver)) {
     setDisplay(false, 0);
     return;
   }
-  if (asleep && mode == SV_LIFE) {
+  if (life) {
     lifeStep();
     lifeRender(fb);
     setDisplay(true, cfg.bright[BR_LIFE]);

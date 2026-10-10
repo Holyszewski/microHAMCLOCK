@@ -182,6 +182,14 @@ savers on the web page, in the **Advanced** section (in percent). When you
 move a slider, the display shows that brightness for a few seconds; it is
 saved only with the Save button.
 
+The Game of Life saver runs until something wakes the display. If you'd
+rather not have it running for days while you're away, tick **turn the
+display off after some days of Game of Life** in **Advanced** and set the
+number of days (2 by default, 1–30; off by default). After that time the
+display turns off, but Game of Life stays the screen saver: the button or
+a spot wakes the display as usual, and the next time the saver starts,
+the days count from zero again.
+
 The **Advanced** section also has the propagation options:
 - **NVIS margin** – how many percent below foF2 the recommended NVIS band
   must lie. The default is 0 % (the band right below foF2); the classic
@@ -197,7 +205,7 @@ Other console commands:
 
 | command    | what it does                                                  |
 |------------|---------------------------------------------------------------|
-| `status`   | prints the settings (time zone, screen rotation, screen saver, night, brightness, NVIS, ionosonde choice), Wi-Fi, time, MQTT, spot count and propagation data (formerly `stav`, which still works) |
+| `status`   | prints the settings (time zone, screen rotation, screen saver, Game of Life limit, night, brightness, NVIS, ionosonde choice), Wi-Fi, time, MQTT, spot count and propagation data (formerly `stav`, which still works) |
 | `snapshot` | prints the display contents; `python tools/snapshot.py COM4 screen.png` turns them into a PNG (formerly `snimek`, which still works) |
 | `blink`    | switches to the propagation screen and demonstrates the flash, as if new data had arrived |
 | `saver`    | turns the screen saver on right away: `saver` the one you set, `saver off`, `saver life` or `saver dim` a given one. The settings don't change; the button, or a spot when spots may wake the display, ends it as usual. Handy for trying the savers and the LED flash on a spot without waiting |
