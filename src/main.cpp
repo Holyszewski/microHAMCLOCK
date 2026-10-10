@@ -950,8 +950,33 @@ static bool jsonText(const String &js, int from, int to, const char *key, char *
   return true;
 }
 
-// One KC2G record: {"source": …, "fof2": 6.0, "mufd": 19.8, "station": {"name": …, "longitude": "14.6",
-// "latitude": "50", "code": "PQ052"}, "time": "2026-10-09T16:40:00", …}. Without foF2 or time → false.
+// Bounds [from, to) of the next top-level object of a JSON array, searched from pos. KC2G does not keep
+// the key order of its records stable (once "source" came first, later "tec"), so records are found
+// by their braces, never by their first key.
+static bool nextJsonObject(const String &js, int pos, int &from, int &to) {
+  const char *s = js.c_str();
+  int depth = 0;
+  bool inStr = false;
+  for (int i = pos, n = js.length(); i < n; i++) {
+    char c = s[i];
+    if (inStr) {
+      if (c == '\\') i++;
+      else if (c == '"') inStr = false;
+    } else if (c == '"') {
+      inStr = true;
+    } else if (c == '{') {
+      if (!depth++) from = i;
+    } else if (c == '}' && depth && !--depth) {
+      to = i + 1;
+      return true;
+    }
+  }
+  return false;
+}
+
+// One KC2G record, keys in any order: {"station": {"code": "PQ052", "name": …, "longitude": "14.6",
+// "latitude": "50"}, "time": "2026-10-09T16:40:00", "fof2": 6.0, "mufd": 19.8, "source": "giro", …}.
+// Without foF2 or time → false.
 static bool parseIonoRecord(const String &js, int from, int to, Iono &io) {
   io = {};
   char lat[12], lon[12], when[24];
@@ -984,9 +1009,7 @@ static bool fetchIono() {           // called only with valid time
   strcpy(last, iono.code);          // iono is written only by this task, so it may read it without the lock
   bool manual = cfg.iono[0], listed = false;
   Iono best = {}, kept = {}, rec;
-  for (int from = js.indexOf("{\"source\""); from >= 0;) {
-    int next = js.indexOf("{\"source\"", from + 1);
-    int to = next < 0 ? js.length() : next;
+  for (int from, to, pos = 0; nextJsonObject(js, pos, from, to); pos = to) {
     if (parseIonoRecord(js, from, to, rec)) {
       bool match = manual && !strcmp(rec.code, cfg.iono);
       listed |= match;
@@ -996,7 +1019,6 @@ static bool fetchIono() {           // called only with valid time
         if (!manual && !strcmp(rec.code, last)) kept = rec;
       }
     }
-    from = next;
   }
   if (kept.ok && kept.km <= best.km + IONO_STICKY_KM) best = kept;
   if (!best.ok) {

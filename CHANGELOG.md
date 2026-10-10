@@ -7,6 +7,10 @@ releases are listed in the Unreleased section.
 
 ## Unreleased
 
+- Fix: foF2 and MUF on the propagation screen could stay `--` for hours.
+  The KC2G parser found records by their first key (`"source"`), but
+  KC2G changes the key order of its records, so after such a change no
+  ionosonde was read. Records are now found by their braces.
 - License changed from MIT to GPL-3.0-or-later, copyright Matěj "Wolf"
   Holyszewski, OK2MTB. Source files carry an SPDX header.
 - Contributor License Agreement (`CLA.md`), `CONTRIBUTING.md` and a
