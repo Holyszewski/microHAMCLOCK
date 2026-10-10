@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+
 #include "life.h"
 
 #include <string.h>

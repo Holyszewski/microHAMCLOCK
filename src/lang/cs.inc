@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+
 // Czech. The rules are in en.inc: S_… texts are plain ASCII without diacritics
 // (the display font has none), W_… texts for the web are UTF-8 with diacritics.
 // A missing text falls back to English. Check with: python tools/check_lang.py

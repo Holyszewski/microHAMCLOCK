@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+
 """
 Firmware version from git. A PlatformIO script (extra_scripts = pre:) that runs
 before every build and writes src/fw_version.h (not in git).

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+
 """
 Saves a snapshot of the microHAMCLOCK display as a PNG.
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+
 // Localization of the texts on the display and on the setup web page.
 // The serial console is English only and is not translated.
 //

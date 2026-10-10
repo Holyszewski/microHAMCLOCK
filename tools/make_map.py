@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+
 """
 Builds src/maps.h – 128×64 land bitmaps for microHAMCLOCK.
 

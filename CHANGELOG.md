@@ -5,6 +5,13 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
+## Unreleased
+
+- License changed from MIT to GPL-3.0-or-later, copyright Matěj "Wolf"
+  Holyszewski, OK2MTB. Source files carry an SPDX header.
+- Contributor License Agreement (`CLA.md`), `CONTRIBUTING.md` and a
+  pull request template.
+
 ## 0.9.1 – 2026-10-10
 
 - Fix: automatic screen rotation could be switched only by a double

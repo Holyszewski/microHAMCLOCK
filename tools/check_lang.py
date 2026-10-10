@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+
 """
 Checks the text catalogs in src/lang/*.inc against the master src/lang/en.inc.
 

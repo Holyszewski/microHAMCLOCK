@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+
 // English – the master catalog. It defines every string ID (in this order)
 // and serves as the fallback for strings a translation doesn't have yet.
 // Only the OLED and the setup web page are translated; the serial console

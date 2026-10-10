@@ -7,7 +7,7 @@
 UTC · propagation · nearest ionosonde · live PSKReporter spots on a list and a world map,
 on the tiny OLED of a Heltec WiFi LoRa 32 V3.
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 ![Board](https://img.shields.io/badge/board-Heltec%20WiFi%20LoRa%2032%20V3-orange)
 ![MCU](https://img.shields.io/badge/MCU-ESP32--S3-red)
 ![Built with PlatformIO](https://img.shields.io/badge/built%20with-PlatformIO-f5822a)
@@ -140,7 +140,7 @@ The serial console understands `setup` (a step-by-step setup wizard), `status`, 
 Display and web texts live in `src/lang/<code>.inc`, with `en.inc` as the master. To add a language,
 copy `en.inc`, translate it, register the language in `src/i18n.h` and `src/i18n.cpp`, and run
 `python tools/check_lang.py`. Display texts must be ASCII, because the OLED font has no accents.
-Pull requests with new languages are very welcome.
+Pull requests with new languages are very welcome (see [Contributing](CONTRIBUTING.md)).
 
 ## Documentation
 
@@ -161,10 +161,24 @@ microHAMCLOCK was designed and tested by OK2MTB and written with the help of AI:
 documentation were developed in conversation with Claude (Anthropic) in Claude Code. Every feature
 was decided by a human and verified on real hardware.
 
+## Contributing
+
+Bug reports and pull requests are welcome. Before a pull request is merged, contributors agree once
+to the [Contributor License Agreement](CLA.md): you keep the copyright, and the author may also
+publish the project under other terms besides the GPL. Details are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
-[MIT](LICENSE). The firmware binaries also contain the Arduino-ESP32 core (LGPL-2.1) and ESP-IDF
-components (mostly Apache-2.0), under their own licenses. The map data is public domain (Natural Earth).
+Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB.
+
+microHAMCLOCK is free software: you can redistribute it and/or modify it under the terms of the
+[GNU General Public License](LICENSE) as published by the Free Software Foundation, either version 3
+of the License, or (at your option) any later version. It is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.
+
+The firmware binaries also contain the Arduino-ESP32 core (LGPL-2.1) and ESP-IDF components (mostly
+Apache-2.0), under their own licenses. The map data is public domain (Natural Earth).
 
 <div align="center">
 

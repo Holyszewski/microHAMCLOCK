@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB
+
 // Time zones for the local time on the display.
 //
 // A short hand-written list of regions (by city) with DST rules in POSIX TZ
