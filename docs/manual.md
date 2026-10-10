@@ -205,13 +205,22 @@ The **Advanced** section also has the propagation options:
 map views: Czechia, Germany, the United Kingdom and the USA (the 48
 contiguous states). All are off by default. See the map screen below.
 
+**Heltec board version**, at the bottom of **Advanced**, is detected
+automatically by default; you can also pick V3 / V3.1 or V3.2 by hand
+(the version is printed on the board). It only matters for measuring the
+battery voltage, because V3.2 switches the measurement on the other way
+round. The `status` command prints the version in use and the battery
+voltage. The voltage means little on USB or without a cell: a board
+without a cell reads about 3.2 V.
+
 Other console commands:
 
 | command    | what it does                                                  |
 |------------|---------------------------------------------------------------|
-| `status`   | prints the settings (time zone, screen rotation, screen saver, Game of Life limit, night, brightness, NVIS, country maps, ionosonde choice), Wi-Fi, time, MQTT, spot count and propagation data (formerly `stav`, which still works) |
+| `status`   | prints the settings (time zone, screen rotation, screen saver, Game of Life limit, night, brightness, NVIS, country maps, ionosonde choice), board version, battery voltage, Wi-Fi, time, MQTT, spot count and propagation data (formerly `stav`, which still works) |
 | `snapshot` | prints the display contents; `python tools/snapshot.py COM4 screen.png` turns them into a PNG (formerly `snimek`, which still works) |
 | `blink`    | switches to the propagation screen and demonstrates the flash, as if new data had arrived |
+| `off`      | powers the board off, like the long press on the status screen (see Controls) |
 | `saver`    | turns the screen saver on right away: `saver` the one you set, `saver off`, `saver life` or `saver dim` a given one. The settings don't change; the button, or a spot when spots may wake the display, ends it as usual. Handy for trying the savers and the LED flash on a spot without waiting |
 
 ## Screens
@@ -244,7 +253,7 @@ otherwise the whole world.
 | short     | next screen                                                  |
 | double    | automatic screen rotation on/off (15 s per screen, set on the web) |
 | triple    | status screen (Wi-Fi, IP, MQTT, data age, version)           |
-| long (0.7 s, fires while still held) | list: sort by time / distance; map: AUTO → WORLD → EUROPE → CZECHIA → GERMANY → UK → USA (only the switched-on countries) |
+| long (0.7 s, fires while still held) | list: sort by time / distance; map: AUTO → WORLD → EUROPE → CZECHIA → GERMANY → UK → USA (only the switched-on countries); status screen: power off |
 | hold 10 s | setup mode (hotspot), see Setup                              |
 
 Rotation, sorting and the map view are saved to flash memory. The long
@@ -252,6 +261,17 @@ press action fires only once; releasing the button doesn't switch anything
 again. If you keep holding, setup opens after 10 s, even though the map or
 the list sorting has switched along the way. At night the display is
 dimmed, see Screen saver and night.
+
+**Power off.** The Heltec charges a Li-ion cell on its battery connector,
+but never disconnects it when it runs flat, so a board left running on
+the battery drains it too deep. A long press on the status screen (triple
+click, then hold) or the `off` console command powers the board off: the
+display says so for a moment, then the display, Wi-Fi and the LoRa radio
+turn off and the ESP32 goes to deep sleep. Only the **RST** button starts
+it again (PRG doesn't). Even powered off the board draws a little, so
+disconnect the cell for long storage. Because the long press fires at
+0.7 s, holding the button for setup doesn't work on the status screen;
+leave it first.
 
 ## Where the data comes from
 

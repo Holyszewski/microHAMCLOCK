@@ -81,6 +81,11 @@ TR(S_NOT_CONNECTED,    "NEPRIPOJENO")
 TR(S_SPOTS,            "SPOTU %d")
 TR(S_UPTIME,           "BEZI %luH %02luM")
 
+// ---- OLED: vypnutí ----
+TR(S_POWER_OFF,        "VYPINANI")
+TR(S_BATTERY_FLAT,     "VYBITA")
+TR(S_POWER_RST,        "ZAPNE TLACITKO RST")
+
 // ---- web page (UTF-8) ----
 TR(W_TITLE,            "microHAMCLOCK: nastavení")
 TR(W_VERSION,          "verze")
@@ -137,6 +142,9 @@ TR(W_MAP_DE,           "Německo")
 TR(W_MAP_UK,           "Spojené království")
 TR(W_MAP_US,           "USA (48 souvislých států)")
 TR(W_MAPS_HINT,        "Zaškrtnutá země přibude mezi pohledy mapy přepínané dlouhým stiskem a AUTO na ni přiblíží, když je v ní tvůj domov i všechny spoty. Česko, Německo a Spojené království ukazují jen hranici, USA i den a noc.")
+TR(W_BOARD,            "Verze desky Heltec")
+TR(W_BOARD_AUTO,       "rozpoznat automaticky")
+TR(W_BOARD_HINT,       "Verze je natištěná na desce. Záleží na ní jen měření napětí baterie, které V3.2 zapíná jinak než V3 a V3.1.")
 TR(W_ERR_SAVER,        "Čas spořiče musí být 0 až 240 minut.")
 TR(W_ERR_LIFE_DAYS,    "Game of Life může běžet 1 až 30 dní, než se displej vypne.")
 TR(W_ERR_IONO,         "Kód ionosondy má nejvýš 7 písmen, číslic nebo podtržítek (např. PQ052).")

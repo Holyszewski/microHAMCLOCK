@@ -82,6 +82,11 @@ TR(S_NOT_CONNECTED,    "NICHT VERBUNDEN")
 TR(S_SPOTS,            "SPOTS %d")
 TR(S_UPTIME,           "SEIT %luH %02luM")
 
+// ---- OLED: Ausschalten ----
+TR(S_POWER_OFF,        "SCHALTE AB")
+TR(S_BATTERY_FLAT,     "AKKU LEER")
+TR(S_POWER_RST,        "START MIT RST")
+
 // ---- web page (UTF-8) ----
 TR(W_TITLE,            "microHAMCLOCK: Einstellungen")
 TR(W_VERSION,          "Version")
@@ -138,6 +143,9 @@ TR(W_MAP_DE,           "Deutschland")
 TR(W_MAP_UK,           "Vereinigtes Königreich")
 TR(W_MAP_US,           "USA (die 48 zusammenhängenden Staaten)")
 TR(W_MAPS_HINT,        "Ein angehaktes Land kommt zu den Kartenansichten hinzu, die ein langer Tastendruck umschaltet, und AUTO zoomt darauf, wenn dein Standort und alle Spots darin liegen. Tschechien, Deutschland und das Vereinigte Königreich zeigen nur die Grenze, die USA auch Tag und Nacht.")
+TR(W_BOARD,            "Version der Heltec-Platine")
+TR(W_BOARD_AUTO,       "automatisch erkennen")
+TR(W_BOARD_HINT,       "Die Version steht auf der Platine. Sie zählt nur für die Messung der Akkuspannung, die V3.2 anders einschaltet als V3 und V3.1.")
 TR(W_ERR_SAVER,        "Die Zeit des Bildschirmschoners muss 0 bis 240 Minuten betragen.")
 TR(W_ERR_LIFE_DAYS,    "Game of Life kann 1 bis 30 Tage laufen, bevor das Display ausgeht.")
 TR(W_ERR_IONO,         "Ein Ionosonden-Code hat höchstens 7 Buchstaben, Ziffern oder Unterstriche (zum Beispiel JR055).")

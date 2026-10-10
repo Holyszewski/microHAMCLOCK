@@ -7,6 +7,15 @@ releases are listed in the Unreleased section.
 
 ## Unreleased
 
+- Power off: a long press on the status screen or the `off` console
+  command turns the display, Wi-Fi and the LoRa radio off and puts the
+  board into deep sleep; the RST button starts it again. For running on
+  a battery, which the board never disconnects when it is flat.
+- Battery voltage measurement, printed by `status`, and a Heltec board
+  version setting (automatic by default, or V3 / V3.1 or V3.2) at the
+  bottom of Advanced, because V3.2 switches the measurement on the other
+  way round. An automatic power off on a flat battery is prepared in the
+  code but switched off.
 - German language on the display and the setup page.
 - Map: new Germany and UK (border outline, like Czechia) and USA (the 48
   contiguous states, with day and night) views. They and the Czechia view

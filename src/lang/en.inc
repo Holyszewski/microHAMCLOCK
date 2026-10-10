@@ -90,6 +90,11 @@ TR(S_NOT_CONNECTED,    "NOT CONNECTED")
 TR(S_SPOTS,            "SPOTS %d")
 TR(S_UPTIME,           "UP %luH %02luM")
 
+// ---- OLED: power off ----
+TR(S_POWER_OFF,        "SHUTDOWN")
+TR(S_BATTERY_FLAT,     "LOW BATT")
+TR(S_POWER_RST,        "PRESS RST TO START")
+
 // ---- web page (UTF-8) ----
 TR(W_TITLE,            "microHAMCLOCK: setup")
 TR(W_VERSION,          "version")
@@ -146,6 +151,9 @@ TR(W_MAP_DE,           "Germany")
 TR(W_MAP_UK,           "United Kingdom")
 TR(W_MAP_US,           "USA (the 48 contiguous states)")
 TR(W_MAPS_HINT,        "A ticked country is added to the map views switched by a long press, and AUTO zooms to it when your home and all spots are inside it. Czechia, Germany and the UK show just the border, the USA also day and night.")
+TR(W_BOARD,            "Heltec board version")
+TR(W_BOARD_AUTO,       "detect automatically")
+TR(W_BOARD_HINT,       "The version is printed on the board. It only matters for measuring the battery voltage, which V3.2 switches on differently than V3 and V3.1.")
 TR(W_ERR_SAVER,        "The screen saver time must be 0 to 240 minutes.")
 TR(W_ERR_LIFE_DAYS,    "Game of Life can run 1 to 30 days before the display turns off.")
 TR(W_ERR_IONO,         "An ionosonde code has at most 7 letters, digits or underscores (for example PQ052).")

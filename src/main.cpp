@@ -21,6 +21,7 @@
     long press    – (after holding 0.7 s) list: sort by time / distance
                     map: view AUTO → WORLD → EUROPE → CZECHIA → GERMANY → UK → USA
                     (the country views only when switched on in the settings)
+                    status: power off (deep sleep, the RST button starts the board again)
     hold 10 s     – setup mode (hotspot), works even while waiting for Wi-Fi
 
   Settings (language, Wi-Fi, callsign, locator) can be entered in two ways:
@@ -36,6 +37,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <SPI.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -47,6 +49,8 @@
 #include <esp_sntp.h>
 #include <esp_netif.h>
 #include <dhcpserver/dhcpserver.h>
+#include <esp_sleep.h>
+#include <driver/gpio.h>
 #if __has_include(<esp_random.h>)
 #include <esp_random.h>               // core 3.x (pioarduino); in 2.x esp_random() is in esp_system.h
 #endif
@@ -112,6 +116,17 @@ static const uint16_t    IONO_MAX_AGE_MIN = 90;   // older measurements are no l
 static const uint16_t    IONO_MAX_KM      = 1500; // a more distant ionosonde says little about local conditions
 static const uint16_t    IONO_STICKY_KM   = 300;  // the current ionosonde stays unless it is this much farther than the nearest
 
+// Battery (a Li-ion cell on the JST connector). The board charges it but never disconnects it when flat.
+// The automatic power off is ready but switched off: the board cannot tell whether USB is plugged in,
+// and without a cell the charger output reads as a flat cell (a steady 3.20 V on a V3.1 on USB).
+static const bool     BAT_AUTO_OFF      = false;   // power off on a flat battery
+static const uint16_t BAT_CHECK_S       = 30;      // how often the voltage is measured
+static const uint16_t BAT_NONE_MV       = 2500;    // lower readings mean no cell (but a missing cell may read higher)
+static const uint16_t BAT_OFF_MV        = 3300;    // flat (under load), BAT_OFF_COUNT readings in a row
+static const uint8_t  BAT_OFF_COUNT     = 4;
+static const uint16_t BAT_ON_MV         = 3600;    // after a power off for a flat battery: charged enough to run
+static const uint16_t BAT_RECHECK_MIN   = 30;      // ... checked this often from deep sleep
+
 // ============================ HARDWARE ============================
 
 static const uint8_t  PIN_OLED_SDA = 17;
@@ -119,6 +134,13 @@ static const uint8_t  PIN_OLED_SCL = 18;
 static const uint8_t  PIN_OLED_RST = 21;
 static const uint8_t  PIN_VEXT     = 36;   // LOW = display power on
 static const uint8_t  PIN_BUTTON   = 0;    // PRG button
+static const uint8_t  PIN_VBAT     = 1;    // battery voltage through a 390k/100k divider
+static const uint8_t  PIN_VBAT_CTRL = 37;  // switches the divider on: LOW on V3 and V3.1, HIGH on V3.2
+static const float    VBAT_DIVIDER = 4.9f;
+// The SX1262 LoRa radio is not used, but it must be put to sleep before powering off,
+// otherwise its standby draws far more than the sleeping ESP32.
+static const uint8_t  PIN_LORA_NSS = 8, PIN_LORA_SCK = 9, PIN_LORA_MOSI = 10, PIN_LORA_MISO = 11;
+static const uint8_t  PIN_LORA_RST = 12, PIN_LORA_BUSY = 13;
 static const uint8_t  OLED_ADDR    = 0x3C;
 static const uint32_t I2C_HZ       = 700000;
 
@@ -344,6 +366,7 @@ struct Config {
   bool nvis60;                      // NVIS: recommend the 60 m band too
   char iono[8];                     // GIRO ionosonde code (e.g. "PQ052"); empty = nearest
   bool mapCz, mapDe, mapUk, mapUs;  // the Czechia, Germany, UK and USA map views are offered (off by default)
+  uint8_t board;                    // BoardRev
 };
 static Config cfg;
 static Preferences prefs;
@@ -353,6 +376,10 @@ enum SaverMode : uint8_t { SV_OFF, SV_LIFE, SV_DIM, SV_MODE_COUNT };      // dis
 enum NightMode : uint8_t { NM_BUTTON, NM_SPOTS, NM_DARK, NM_MODE_COUNT }; // at night only the button wakes / spots too / dark
 static const char *const SAVER_CODE[SV_MODE_COUNT] = {"off", "life", "dim"};
 static const char *const NIGHT_CODE[NM_MODE_COUNT] = {"button", "spots", "dark"};
+// Board revision, only for the battery measurement (V3.2 switches the divider the other way).
+enum BoardRev : uint8_t { BD_AUTO, BD_V31, BD_V32, BD_COUNT };
+static const char *const BOARD_CODE[BD_COUNT] = {"auto", "v31", "v32"};
+static const char *const BOARD_NAME[BD_COUNT] = {"auto", "V3 / V3.1", "V3.2"};
 
 static void loadString(const char *key, char *out, size_t n) {
   if (prefs.isKey(key)) prefs.getString(key, out, n);   // without isKey() the library logs a missing key as an error
@@ -398,6 +425,7 @@ static void loadConfig() {
   cfg.mapDe = prefs.getBool("mapde", false);
   cfg.mapUs = prefs.getBool("mapus", false);
   cfg.mapUk = prefs.getBool("mapuk", false);
+  cfg.board = prefs.getUChar("board", BD_AUTO) % BD_COUNT;
 }
 
 static void saveConfig(const Config &c) {
@@ -426,6 +454,7 @@ static void saveConfig(const Config &c) {
   prefs.putBool("mapde", c.mapDe);
   prefs.putBool("mapus", c.mapUs);
   prefs.putBool("mapuk", c.mapUk);
+  prefs.putUChar("board", c.board);
   if (prefs.isKey("tz")) prefs.remove("tz");            // POSIX string from version 0.1, no longer used
 }
 
@@ -1170,6 +1199,131 @@ static void netTask(void *) {
   }
 }
 
+// ============================ POWER (BATTERY, POWER OFF) ============================
+// The battery voltage is measured on GPIO1 through a divider that GPIO37 switches on. Its polarity
+// differs between revisions: V3 and V3.1 have a pull-up and are active LOW, V3.2 has a transistor and
+// is active HIGH. The pull-up also tells them apart: the pin left as an input reads HIGH only on V3/V3.1.
+// Power off = deep sleep with no wake-up source; only the RST button (a full reset) starts the board.
+
+static TaskHandle_t netTaskHandle;
+static bool boardV32Detected;
+static uint16_t batteryMv;          // last measurement, 0 = not measured yet
+
+static bool boardV32() { return cfg.board == BD_V32 || (cfg.board == BD_AUTO && boardV32Detected); }
+
+static const char *boardName() { return BOARD_NAME[boardV32() ? BD_V32 : BD_V31]; }
+
+// Called at boot before anything drives GPIO37; then the divider stays on (about 9 µA, nothing next to Wi-Fi).
+static void batteryInit() {
+  gpio_hold_dis(gpio_num_t(PIN_VBAT_CTRL));    // held since a power off when woken by the timer
+  pinMode(PIN_VBAT_CTRL, INPUT);
+  delayMicroseconds(200);
+  boardV32Detected = digitalRead(PIN_VBAT_CTRL) == LOW;
+  pinMode(PIN_VBAT_CTRL, OUTPUT);
+  digitalWrite(PIN_VBAT_CTRL, boardV32() ? HIGH : LOW);
+  delay(2);
+}
+
+static uint16_t readBatteryMv() {
+  uint32_t sum = 0;
+  for (int i = 0; i < 16; i++) sum += analogReadMilliVolts(PIN_VBAT);
+  return sum / 16 * VBAT_DIVIDER;
+}
+
+static bool batteryPresent(uint16_t mv) { return mv >= BAT_NONE_MV; }
+
+// Rough charge of a Li-ion cell from its voltage under a light load.
+static int batteryPercent(uint16_t mv) {
+  static const uint16_t MV[] = {3300, 3400, 3500, 3600, 3700, 3800, 3900, 4000, 4100, 4200};
+  static const uint8_t PCT[] = {0, 4, 10, 22, 40, 55, 68, 79, 90, 100};
+  if (mv <= MV[0]) return 0;
+  for (size_t i = 1; i < sizeof MV / sizeof MV[0]; i++)
+    if (mv <= MV[i]) return PCT[i - 1] + (PCT[i] - PCT[i - 1]) * (mv - MV[i - 1]) / (MV[i] - MV[i - 1]);
+  return 100;
+}
+
+// Puts the SX1262 into sleep (SetSleep, cold start); after a power-on it sits in standby.
+static void loraSleep() {
+  pinMode(PIN_LORA_RST, OUTPUT);
+  digitalWrite(PIN_LORA_RST, HIGH);
+  pinMode(PIN_LORA_NSS, OUTPUT);
+  digitalWrite(PIN_LORA_NSS, HIGH);
+  pinMode(PIN_LORA_BUSY, INPUT);
+  SPI.begin(PIN_LORA_SCK, PIN_LORA_MISO, PIN_LORA_MOSI, PIN_LORA_NSS);
+  for (uint32_t t = millis(); digitalRead(PIN_LORA_BUSY) == HIGH && millis() - t < 20;) delay(1);
+  SPI.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE0));
+  digitalWrite(PIN_LORA_NSS, LOW);
+  SPI.transfer(0x84);               // SetSleep
+  SPI.transfer(0x00);               // cold start, RTC timeout off
+  digitalWrite(PIN_LORA_NSS, HIGH);
+  SPI.endTransaction();
+  SPI.end();
+  delay(1);
+}
+
+static void holdPin(uint8_t pin, bool high) {
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, high ? HIGH : LOW);
+  gpio_hold_en(gpio_num_t(pin));
+}
+
+// Pins held through deep sleep are released at boot (a timer wake keeps the holds).
+static void releasePinHolds() {
+  for (uint8_t pin : {PIN_VEXT, PIN_VBAT_CTRL, PIN_LORA_NSS, PIN_LORA_RST}) gpio_hold_dis(gpio_num_t(pin));
+  gpio_deep_sleep_hold_dis();
+}
+
+// Turns everything off and goes to deep sleep. flat = the battery is flat: then the board wakes every
+// BAT_RECHECK_MIN to check whether it has been charged. show = say so on the display first.
+static void powerOff(bool flat, bool show) {
+  if (show) {
+    memset(fb, 0, sizeof fb);
+    const char *title = tr(flat ? S_BATTERY_FLAT : S_POWER_OFF);
+    if (textWidth(title, 2) <= 128) drawTextCenter(title, 14, 2);
+    else                            drawTextCenter(title, 18);   // too long for big letters
+    drawTextCenter(tr(S_POWER_RST), 40);
+    oledPower(true);
+    oledContrast(cfg.bright[BR_DAY]);
+    oledFlush();
+  }
+  Serial.println(flat ? "Power off: battery flat" : "Power off: press RST to start again");
+  Serial.flush();
+  if (show) delay(1500);
+  if (netTaskHandle) vTaskSuspend(netTaskHandle);
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+  digitalWrite(LED_BUILTIN, LOW);
+  loraSleep();
+  Wire.end();                       // no pull-ups on the I2C lines of the unpowered display
+  for (uint8_t pin : {PIN_OLED_SDA, PIN_OLED_SCL, PIN_OLED_RST}) pinMode(pin, INPUT);
+  holdPin(PIN_VEXT, true);          // display power off
+  holdPin(PIN_VBAT_CTRL, !boardV32());   // battery divider off
+  holdPin(PIN_LORA_NSS, true);      // a falling NSS would wake the radio
+  holdPin(PIN_LORA_RST, true);
+  gpio_deep_sleep_hold_en();
+  if (flat) esp_sleep_enable_timer_wakeup(BAT_RECHECK_MIN * 60ULL * 1000000ULL);
+  esp_deep_sleep_start();
+}
+
+// Measures the battery now and then. With BAT_AUTO_OFF a flat cell powers the board off.
+static void batteryService(uint32_t now) {
+  static uint32_t lastAt;
+  static uint8_t lowCount;
+  if (batteryMv && now - lastAt < BAT_CHECK_S * 1000UL) return;
+  lastAt = now;
+  batteryMv = readBatteryMv();
+  if (!BAT_AUTO_OFF) return;
+  lowCount = batteryPresent(batteryMv) && batteryMv < BAT_OFF_MV ? lowCount + 1 : 0;
+  if (lowCount >= BAT_OFF_COUNT) powerOff(true, true);
+}
+
+// After a power off for a flat battery the timer wakes the board: back to sleep unless it was charged.
+static void batteryBootCheck() {
+  if (!BAT_AUTO_OFF || esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_TIMER) return;
+  uint16_t mv = readBatteryMv();
+  if (batteryPresent(mv) && mv < BAT_ON_MV) powerOff(true, false);
+}
+
 // ============================ SERIAL CONSOLE ============================
 // "setup" starts a wizard that asks for everything needed, step by step.
 // The wizard does not block, the display keeps running meanwhile.
@@ -1476,6 +1630,12 @@ static void printStatus() {
   Serial.printf("NVIS: margin %u %% below foF2, 60 m %s\n", cfg.nvisMargin, cfg.nvis60 ? "on" : "off");
   Serial.printf("Country maps: Czechia %s, Germany %s, UK %s, USA %s\n", cfg.mapCz ? "on" : "off",
                 cfg.mapDe ? "on" : "off", cfg.mapUk ? "on" : "off", cfg.mapUs ? "on" : "off");
+  Serial.printf("Board: Heltec %s (%s)\n", boardName(), cfg.board == BD_AUTO ? "detected" : "set by hand");
+  if (batteryPresent(batteryMv))
+    Serial.printf("Battery: %u.%02u V, about %d %% (means little on USB or without a cell)\n", batteryMv / 1000,
+                  batteryMv % 1000 / 10, batteryPercent(batteryMv));
+  else
+    Serial.printf("Battery: none (%u mV)\n", batteryMv);
   if (!cfg.ssid[0]) Serial.println("WiFi: not set up (command setup)");
   else if (wifiUp)  Serial.printf("WiFi: %s, IP %s, %d dBm\n", cfg.ssid, WiFi.localIP().toString().c_str(), WiFi.RSSI());
   else              Serial.printf("WiFi: connecting to %s\n", cfg.ssid);
@@ -1800,7 +1960,7 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
   // advanced: display brightness; collapsed while everything is at defaults
   bool custom = memcmp(v.bright, BRIGHT_DEFAULT, sizeof BRIGHT_DEFAULT) != 0 || v.nvisMargin || !v.nvis60 || v.iono[0] ||
                 v.rotateSec != DEFAULT_ROTATE_S || v.lifeOff || v.lifeDays != DEFAULT_LIFE_DAYS || v.mapCz || v.mapDe ||
-                v.mapUk || v.mapUs;
+                v.mapUk || v.mapUs || v.board != BD_AUTO;
   b += custom ? "<details open><summary>" : "<details><summary>";
   b += tr(W_ADVANCED, lang);
   b += "</summary><label for=rotsec>";
@@ -1882,6 +2042,16 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
   mapBox("mapus", v.mapUs, W_MAP_US);
   b += "<small>";
   b += tr(W_MAPS_HINT, lang);
+  b += "</small><label for=board>";
+  b += tr(W_BOARD, lang);
+  b += "</label><select id=board name=board>";
+  for (int r = 0; r < BD_COUNT; r++) {
+    String label = r == BD_AUTO ? String(tr(W_BOARD_AUTO, lang)) + " (" + BOARD_NAME[boardV32Detected ? BD_V32 : BD_V31] + ")"
+                                : String(BOARD_NAME[r]);
+    addOption(b, BOARD_CODE[r], label.c_str(), r == v.board);
+  }
+  b += "</select><small>";
+  b += tr(W_BOARD_HINT, lang);
   b += "</small></details>";
 
   b += "<button type=submit>";
@@ -2019,6 +2189,8 @@ static void handleSave() {
   d.mapDe = web.hasArg("mapde");
   d.mapUs = web.hasArg("mapus");
   d.mapUk = web.hasArg("mapuk");
+  int board = codeIndex(web.arg("board"), BOARD_CODE, BD_COUNT);
+  if (board >= 0) d.board = board;
 
   int err = checkBasic(d, web.arg("ssid"), web.arg("pass"), web.hasArg("open"), web.arg("call"), web.arg("loc"),
                        web.arg("tz"));
@@ -2376,8 +2548,10 @@ static void serialService() {
   else if (!strcasecmp(line, "snapshot") || !strcasecmp(line, "snimek")) printScreenshot();
   else if (!strcasecmp(line, "blink"))                               blinkTestAt = (millis() + 1000) | 1;
   else if (!strncasecmp(line, "saver", 5) && (!line[5] || line[5] == ' ')) saverCommand(line + 5);
+  else if (!strcasecmp(line, "off"))                                 powerOff(false, true);
   else if (line[0]) Serial.println("Commands: setup = settings, status = what is going on, snapshot = screen dump, "
-                                   "blink = test the propagation screen blink, saver [off|life|dim] = screen saver now");
+                                   "blink = test the propagation screen blink, saver [off|life|dim] = screen saver now, "
+                                   "off = power off (RST starts again)");
 }
 
 // ============================ SCREENS ============================
@@ -2913,7 +3087,10 @@ static void handleButton(uint32_t now) {
       showStatus = !showStatus;
       break;
     case BTN_LONG:
-      if (showStatus) break;
+      if (showStatus) {             // long press on the status screen: power off
+        powerOff(false, true);
+        break;
+      }
       if (screen == S_PSK_LIST) {
         sortByDist = !sortByDist;
         prefs.putBool("sortdist", sortByDist);
@@ -2934,13 +3111,16 @@ static void handleButton(uint32_t now) {
 
 void setup() {
   Serial.begin(115200);
+  releasePinHolds();
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   digitalWrite(LED_BUILTIN, LOW);
   pinMode(LED_BUILTIN, OUTPUT);
-  oledInit();
-
   prefs.begin(NVS_NAMESPACE, false);
   loadConfig();
+  batteryInit();
+  batteryBootCheck();               // after a power off for a flat battery: sleeps on unless charged
+  oledInit();
+
   setLanguage(cfgLang(cfg));
   sortByDist = prefs.getBool("sortdist", false);
   mapMode = prefs.getUChar("mapmode", MM_AUTO) % MM_COUNT;
@@ -2959,7 +3139,7 @@ void setup() {
   setenv("TZ", tzRule, 1);
   tzset();
   if (portalMode) portalStart();
-  else xTaskCreatePinnedToCore(netTask, "net", 16384, nullptr, 1, nullptr, 0);
+  else xTaskCreatePinnedToCore(netTask, "net", 16384, nullptr, 1, &netTaskHandle, 0);
   screenSince = lastActivity = millis();
 }
 
@@ -3058,6 +3238,7 @@ void loop() {
   if (portalMode) portalService();
   if (restartPending && (int32_t)(now - restartAt) >= 0) ESP.restart();
   saverService(now);
+  batteryService(now);
 
   if (blinkTestAt && !portalMode && wiz == WZ_OFF) {   // test: show the propagation screen and a moment later "new data"
     screen = S_SOLAR;
