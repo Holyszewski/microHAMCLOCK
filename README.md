@@ -103,7 +103,7 @@ One button, **PRG**:
 | Press | Action |
 |---|---|
 | Short | next screen |
-| Double | auto-rotate screens on/off (15 s per screen by default) |
+| Double | automatic screen switching on/off (15 s per screen by default) |
 | Triple | status screen (Wi-Fi, IP, MQTT, data age, version) |
 | Long (0.7 s) | list: sort by time or distance · map: AUTO → WORLD → EUROPE (→ CZECHIA → GERMANY → UK → USA, when switched on) · status screen: power off (**RST** starts the board again) |
 | Hold 10 s | setup mode (hotspot) |
