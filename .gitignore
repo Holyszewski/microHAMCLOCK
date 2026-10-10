@@ -1,0 +1,4 @@
+.pio/
+src/fw_version.h
+firmware/
+site/
