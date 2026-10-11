@@ -71,6 +71,7 @@ static const bool     DEFAULT_ROTATE    = true;    // automatic screen rotation,
 static const uint8_t  DEFAULT_ROTATE_S  = 15;      // how long a screen stays up in automatic rotation (web: Advanced)
 static const uint8_t  MIN_ROTATE_S      = 5;
 static const uint8_t  MAX_ROTATE_S      = 120;
+static const uint8_t  MAP_EMPTY_S       = 5;       // in automatic switching the map without spots stays up only this long (at most the set time)
 static const uint16_t SPOT_WINDOW_MIN   = 60;      // how old spots are still shown
 static const uint16_t LIST_PAGE_MS      = 5000;    // paging of a long spot list
 static const uint16_t NEW_SPOT_BLINK_S  = 60;      // how long a new spot blinks on the map
@@ -370,6 +371,7 @@ struct Config {
   bool rotate;                      // automatic screen rotation
   uint8_t rotateSec;                // seconds per screen in rotation
   bool rotateAll;                   // rotation also cycles the spot screens when there are no spots
+  bool rotateMap;                   // without spots, rotation also shows the map (the world, in AUTO)
   uint8_t nightFrom, nightTo;       // night hours (local time); equal = no night
   uint8_t nightMode;                // NightMode
   uint8_t bright[BR_COUNT];         // brightness (SSD1306 contrast) per BrightMode
@@ -426,6 +428,7 @@ static void loadConfig() {
   cfg.rotate = prefs.getBool("rotate", DEFAULT_ROTATE);
   cfg.rotateSec = constrain(prefs.getUChar("rotsec", DEFAULT_ROTATE_S), MIN_ROTATE_S, MAX_ROTATE_S);
   cfg.rotateAll = prefs.getBool("rotall", false);
+  cfg.rotateMap = prefs.getBool("rotmap", true);
   cfg.nightFrom = prefs.getUChar("nfrom", DEFAULT_NIGHT_FROM) % 24;
   cfg.nightTo = prefs.getUChar("nto", DEFAULT_NIGHT_TO) % 24;
   cfg.nightMode = prefs.getUChar("nmode", NM_SPOTS) % NM_MODE_COUNT;
@@ -456,6 +459,7 @@ static void saveConfig(const Config &c) {
   prefs.putBool("rotate", c.rotate);
   prefs.putUChar("rotsec", c.rotateSec);
   prefs.putBool("rotall", c.rotateAll);
+  prefs.putBool("rotmap", c.rotateMap);
   prefs.putUChar("nfrom", c.nightFrom);
   prefs.putUChar("nto", c.nightTo);
   prefs.putUChar("nmode", c.nightMode);
@@ -1668,7 +1672,7 @@ static void printStatus() {
                 cfg.loc[0] ? cfg.loc : "-", langInfo(language()).nameAscii);
   Serial.printf("Time zone %s (%s)\n", cfg.tz, tzRule);
   if (cfg.rotate) Serial.printf("Screen rotation: on, every %u s, without spots %s\n", cfg.rotateSec,
-                                cfg.rotateAll ? "all screens" : "clock and propagation only");
+                                cfg.rotateAll ? "all screens" : cfg.rotateMap ? "clock, propagation and map" : "clock and propagation only");
   else            Serial.println("Screen rotation: off");
   if (cfg.saverMin)
     Serial.printf("Screen saver: %s after %u min, new spot %s, now %s\n", SAVER_CODE[cfg.saverMode], cfg.saverMin,
@@ -2057,7 +2061,7 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
 
   // advanced: display brightness; collapsed while everything is at defaults
   bool custom = memcmp(v.bright, BRIGHT_DEFAULT, sizeof BRIGHT_DEFAULT) != 0 || v.nvisMargin || !v.nvis60 || v.iono[0] ||
-                v.rotateSec != DEFAULT_ROTATE_S || v.rotateAll || v.lifeOff || v.lifeDays != DEFAULT_LIFE_DAYS || v.mapCz || v.mapDe ||
+                v.rotateSec != DEFAULT_ROTATE_S || v.rotateAll || !v.rotateMap || v.lifeOff || v.lifeDays != DEFAULT_LIFE_DAYS || v.mapCz || v.mapDe ||
                 v.mapUk || v.mapUs || v.board != BD_AUTO;
   b += custom ? "<details open><summary>" : "<details><summary>";
   b += tr(W_ADVANCED, lang);
@@ -2069,10 +2073,14 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
   b += (int)MAX_ROTATE_S;
   b += " value=";
   b += (int)v.rotateSec;
-  b += "><label class=chk><input type=checkbox name=rotall value=1";
+  b += "><label class=chk><input type=checkbox id=rotall name=rotall value=1";
   if (v.rotateAll) b += " checked";
   b += "> ";
   b += tr(W_ROTATE_ALL, lang);
+  b += "</label><label class=chk id=rotmapl><input type=checkbox name=rotmap value=1";
+  if (v.rotateMap) b += " checked";
+  b += "> ";
+  b += tr(W_ROTATE_MAP, lang);
   b += "</label><b>";
   b += tr(W_BRIGHT, lang);
   b += "</b>";
@@ -2198,6 +2206,9 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
          // LED on spot wake-up only makes sense with spot wake-up enabled
          "(function(){var w=document.getElementById('svspot'),l=document.getElementById('svledl');"
          "function u(){l.classList.toggle('off',!w.checked)}w.onchange=u;u()})();"
+         // the map option has no effect while all screens rotate without spots anyway
+         "(function(){var w=document.getElementById('rotall'),l=document.getElementById('rotmapl');"
+         "function u(){l.classList.toggle('off',w.checked)}w.onchange=u;u()})();"
          "(function(){var w=document.getElementById('lfoff'),l=document.getElementById('lfd');"
          "function u(){l.classList.toggle('off',!w.checked)}w.onchange=u;u()})();"
          // brightness: number next to the slider and preview on the display (at most one request per 150 ms)
@@ -2304,6 +2315,7 @@ static void handleSave() {
   long rotsec = web.arg("rotsec").toInt();
   if (rotsec >= MIN_ROTATE_S && rotsec <= MAX_ROTATE_S) d.rotateSec = rotsec;
   d.rotateAll = web.hasArg("rotall");
+  d.rotateMap = web.hasArg("rotmap");
   long nf = web.arg("nfrom").toInt(), nt = web.arg("nto").toInt();
   if (nf >= 0 && nf < 24) d.nightFrom = nf;
   if (nt >= 0 && nt < 24) d.nightTo = nt;
@@ -3172,11 +3184,12 @@ static bool hasRecentSpot() {
 }
 
 // Automatic switching goes on to the next screen after `from`. Without spots (and without the Advanced
-// "all screens" option) only the clock and the propagation screen take part; the spot screens stay reachable by hand.
-static int nextRotationScreen(int from, bool allScreens) {
+// "all screens" option) the clock, the propagation screen and, unless switched off in Advanced, the map take part;
+// the empty spot list stays reachable by hand.
+static int nextRotationScreen(int from, bool allScreens, bool withMap) {
   for (int k = 1; k <= SCREEN_COUNT; k++) {
     int s = (from + k) % SCREEN_COUNT;
-    if (allScreens || s == S_CLOCK || s == S_SOLAR) return s;
+    if (allScreens || s == S_CLOCK || s == S_SOLAR || (withMap && s == S_PSK_MAP)) return s;
   }
   return from;
 }
@@ -3461,8 +3474,10 @@ void loop() {
     }
   }
 
-  if (cfg.rotate && !portalMode && !showStatus && wiz == WZ_OFF && now - screenSince >= cfg.rotateSec * 1000UL) {
-    screen = nextRotationScreen(screen, cfg.rotateAll || hasRecentSpot());
+  uint32_t stayMs = cfg.rotateSec * 1000UL;
+  if (cfg.rotate && screen == S_PSK_MAP && stayMs > MAP_EMPTY_S * 1000UL && !hasRecentSpot()) stayMs = MAP_EMPTY_S * 1000UL;   // an empty map shows just the terminator
+  if (cfg.rotate && !portalMode && !showStatus && wiz == WZ_OFF && now - screenSince >= stayMs) {
+    screen = nextRotationScreen(screen, cfg.rotateAll || hasRecentSpot(), cfg.rotateMap);
     screenSince = now;
   }
   if ((int32_t)(now - nextFrame) >= 0) {

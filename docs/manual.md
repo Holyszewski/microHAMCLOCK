@@ -192,12 +192,17 @@ default; a double click on the button toggles it too). How many seconds
 each screen stays up (15 by default, 5–120) is in the **Advanced**
 section.
 
-Without any spot in the last hour, rotation goes only between the clock and
-the propagation screen: the spot list and the spot map are not shown
-automatically, but you can still reach them with the button. As soon as a
-spot comes in, rotation goes through all four screens again. The
-**Advanced** option "without spots, switch all screens too" keeps all four
-in rotation even with no spots (off by default).
+Without any spot in the last hour, rotation goes between the clock, the
+propagation screen and the map: the empty spot list is not shown
+automatically, but you can still reach it with the button. In the AUTO
+view, which is the world without spots, the map shows where it is day and
+night, and it stays up for only 5 seconds, because there is little on it.
+As soon as a spot comes in, rotation goes through all four screens again.
+Two **Advanced** options change this without spots: "without spots, switch
+the map too" (on by default) can be turned off, which leaves just the
+clock and the propagation screen, and "without spots, switch all screens
+too" keeps all four in rotation (off by default). The map option is greyed
+out while the "all screens" option is on, because it has no effect then.
 
 You can change the display brightness for day, night and both screen
 savers on the web page, in the **Advanced** section (in percent). When you
