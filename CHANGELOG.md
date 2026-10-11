@@ -5,6 +5,14 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
+## Unreleased
+
+- Fix: on the map a new, blinking spot could be hidden under an older one
+  nearby (or the same station on another band). The spots were drawn from
+  the last memory slot to the first, and a new spot usually takes the last
+  one, so it was drawn first and the older ones covered it; now they are
+  drawn by arrival time, the newest on top.
+
 ## 0.11.1 – 2026-10-11
 
 - Docs: README and the manual say that microHAMCLOCK is meant mainly for

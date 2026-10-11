@@ -2785,6 +2785,12 @@ static int byDistance(const void *a, const void *b) {
   return (int)((const Spot *)b)->km - (int)((const Spot *)a)->km;
 }
 
+// Oldest arrival first, so the map draws the newest (blinking) spots last, on top of the rest.
+static int byArrival(const void *a, const void *b) {
+  int32_t d = (int32_t)(((const Spot *)a)->rxMs - ((const Spot *)b)->rxMs);
+  return d < 0 ? -1 : d > 0 ? 1 : 0;
+}
+
 static void drawLabel(const char *s) {
   int tw = textWidth(s);
   int x0 = (128 - tw - 6) / 2, y0 = 53;
@@ -3044,7 +3050,8 @@ static void renderPskMap() {
   uint32_t nowMs = millis();
   bool pulse = (nowMs / 500) & 1;
   int shown = 0;
-  for (int i = snapCount - 1; i >= 0; i--) {
+  qsort(snap, snapCount, sizeof(Spot), byArrival);   // each spot clears a 7×7 square, so the later one wins
+  for (int i = 0; i < snapCount; i++) {
     const Spot &s = snap[i];
     if (!inView(*m, s.lat, s.lon)) continue;
     shown++;
