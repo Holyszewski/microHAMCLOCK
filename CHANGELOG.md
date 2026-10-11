@@ -5,6 +5,12 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
+## Unreleased
+
+- Docs: README and the manual say that microHAMCLOCK is meant mainly for
+  stationary use, plugged into a USB charger all the time, with or without
+  a battery.
+
 ## 0.11.0 – 2026-10-11
 
 - Docs: README and the manual now acknowledge the GIRO network and its

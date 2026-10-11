@@ -61,6 +61,8 @@ own: the board talks straight to public ham radio data feeds over Wi-Fi.
 - A **[Heltec WiFi LoRa 32 V3](https://heltec.org/project/wifi-lora-32-v3/)** (ESP32-S3 with a
   0.96″ 128×64 OLED). The LoRa radio is not used.
 - A USB-C cable and a 2.4 GHz Wi-Fi network.
+- A USB charger or power supply. microHAMCLOCK is meant mainly for stationary use on your desk,
+  plugged in all the time; a battery is not needed.
 - Your callsign and Maidenhead locator.
 - Optional, recommended: a 3D-printed case. The
   [Bender Battery Case for the Heltec V3](https://www.printables.com/model/797822-bender-battery-case-for-the-heltec-v3-heltec-t114)

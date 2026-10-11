@@ -7,6 +7,10 @@ A small ham radio clock on a 128×64 OLED display: UTC, propagation
 conditions and live PSKReporter spots (who heard you), as a list and on
 a world map. No external libraries, and all it needs is Wi-Fi.
 
+It is meant mainly for stationary use: on your desk, plugged into a USB
+charger or power supply all the time, with or without a battery. Wi-Fi
+stays on, so a battery alone doesn't last long.
+
 Versions are numbered `0.x.y` while the project is unfinished. What changed
 in each version is in the [CHANGELOG.md](../CHANGELOG.md). The current
 version is shown at startup, on the status screen (triple click), in the
@@ -296,8 +300,10 @@ again. If you keep holding, setup opens after 10 s, even though the map or
 the list sorting has switched along the way. At night the display is
 dimmed, see Screen saver and night.
 
-**Power off.** The Heltec charges a Li-ion cell on its battery connector,
-but never disconnects it when it runs flat, so a board left running on
+**Power off.** microHAMCLOCK is meant to stay plugged into a charger, so
+you need this only when it runs from a battery. The Heltec charges a
+Li-ion cell on its battery connector, but never disconnects it when it
+runs flat, so a board left running on
 the battery drains it too deep. A long press on the status screen (triple
 click, then hold) or the `off` console command powers the board off: the
 display says so for a moment, then the display, Wi-Fi and the LoRa radio
