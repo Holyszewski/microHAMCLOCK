@@ -115,8 +115,17 @@ microHAMCLOCK only shows data that others kindly make public. Thank you to:
 - **[PSKReporter](https://pskreporter.info/)** by Philip Gladstone, N1DQ, and its live
   **MQTT feed** by Tom Fanning, M0LTE: the reception reports.
 - **[N0NBH](https://www.hamqsl.com/solar.html)**, Paul Herrman: solar and band condition data.
-- **[KC2G](https://prop.kc2g.com/)** and the **[GIRO](https://giro.uml.edu/)** ionosonde network:
-  foF2 and MUF measurements.
+- **[KC2G](https://prop.kc2g.com/)**, Andrew Rodland, KC2G, who republishes the ionosonde
+  measurements, and the **[GIRO](https://giro.uml.edu/)** ionosonde network (Lowell GIRO Data
+  Center, University of Massachusetts Lowell) with the observatories that run the stations:
+  foF2 and MUF measurements. The station in use is shown on the status screen, and the
+  observatory contacts are in the GIRO
+  [Acknowledgements List](https://giro.uml.edu/didbase/acknowledgements.html). GIRO data is
+  released under [CC BY-NC-SA 4.0](https://giro.uml.edu/didbase/RulesOfTheRoad.html). Source:
+  Reinisch, B. W., and I. A. Galkin, *Global Ionospheric Radio Observatory (GIRO)*, Earth,
+  Planets and Space, 63, 377–381 (2011),
+  [doi:10.5047/eps.2011.03.001](https://doi.org/10.5047/eps.2011.03.001),
+  <http://spase.info/SMWG/Observatory/GIRO>.
 - **[Natural Earth](https://www.naturalearthdata.com/)**: public domain map data.
 - **NTP**: [ntp.ufe.cz](https://www.ufe.cz/) (the Czech national time standard), `tik.cesnet.cz`
   and `pool.ntp.org`.

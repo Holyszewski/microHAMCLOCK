@@ -369,6 +369,7 @@ struct Config {
   uint8_t lifeDays;                 // days of Game of Life before the display turns off
   bool rotate;                      // automatic screen rotation
   uint8_t rotateSec;                // seconds per screen in rotation
+  bool rotateAll;                   // rotation also cycles the spot screens when there are no spots
   uint8_t nightFrom, nightTo;       // night hours (local time); equal = no night
   uint8_t nightMode;                // NightMode
   uint8_t bright[BR_COUNT];         // brightness (SSD1306 contrast) per BrightMode
@@ -424,6 +425,7 @@ static void loadConfig() {
   cfg.lifeDays = constrain(prefs.getUChar("lfdays", DEFAULT_LIFE_DAYS), 1, MAX_LIFE_DAYS);
   cfg.rotate = prefs.getBool("rotate", DEFAULT_ROTATE);
   cfg.rotateSec = constrain(prefs.getUChar("rotsec", DEFAULT_ROTATE_S), MIN_ROTATE_S, MAX_ROTATE_S);
+  cfg.rotateAll = prefs.getBool("rotall", false);
   cfg.nightFrom = prefs.getUChar("nfrom", DEFAULT_NIGHT_FROM) % 24;
   cfg.nightTo = prefs.getUChar("nto", DEFAULT_NIGHT_TO) % 24;
   cfg.nightMode = prefs.getUChar("nmode", NM_SPOTS) % NM_MODE_COUNT;
@@ -453,6 +455,7 @@ static void saveConfig(const Config &c) {
   prefs.putUChar("lfdays", c.lifeDays);
   prefs.putBool("rotate", c.rotate);
   prefs.putUChar("rotsec", c.rotateSec);
+  prefs.putBool("rotall", c.rotateAll);
   prefs.putUChar("nfrom", c.nightFrom);
   prefs.putUChar("nto", c.nightTo);
   prefs.putUChar("nmode", c.nightMode);
@@ -1664,7 +1667,8 @@ static void printStatus() {
   Serial.printf("Callsign %s, locator %s, display language %s\n", cfg.call[0] ? cfg.call : "-",
                 cfg.loc[0] ? cfg.loc : "-", langInfo(language()).nameAscii);
   Serial.printf("Time zone %s (%s)\n", cfg.tz, tzRule);
-  if (cfg.rotate) Serial.printf("Screen rotation: on, every %u s\n", cfg.rotateSec);
+  if (cfg.rotate) Serial.printf("Screen rotation: on, every %u s, without spots %s\n", cfg.rotateSec,
+                                cfg.rotateAll ? "all screens" : "clock and propagation only");
   else            Serial.println("Screen rotation: off");
   if (cfg.saverMin)
     Serial.printf("Screen saver: %s after %u min, new spot %s, now %s\n", SAVER_CODE[cfg.saverMode], cfg.saverMin,
@@ -2053,7 +2057,7 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
 
   // advanced: display brightness; collapsed while everything is at defaults
   bool custom = memcmp(v.bright, BRIGHT_DEFAULT, sizeof BRIGHT_DEFAULT) != 0 || v.nvisMargin || !v.nvis60 || v.iono[0] ||
-                v.rotateSec != DEFAULT_ROTATE_S || v.lifeOff || v.lifeDays != DEFAULT_LIFE_DAYS || v.mapCz || v.mapDe ||
+                v.rotateSec != DEFAULT_ROTATE_S || v.rotateAll || v.lifeOff || v.lifeDays != DEFAULT_LIFE_DAYS || v.mapCz || v.mapDe ||
                 v.mapUk || v.mapUs || v.board != BD_AUTO;
   b += custom ? "<details open><summary>" : "<details><summary>";
   b += tr(W_ADVANCED, lang);
@@ -2065,7 +2069,11 @@ static void sendForm(Lang lang, const char *error, const Config &v, bool autoTz)
   b += (int)MAX_ROTATE_S;
   b += " value=";
   b += (int)v.rotateSec;
-  b += "><b>";
+  b += "><label class=chk><input type=checkbox name=rotall value=1";
+  if (v.rotateAll) b += " checked";
+  b += "> ";
+  b += tr(W_ROTATE_ALL, lang);
+  b += "</label><b>";
   b += tr(W_BRIGHT, lang);
   b += "</b>";
   static const StrId BRIGHT_TEXT[BR_COUNT] = {W_BRIGHT_DAY, W_BRIGHT_NIGHT, W_BRIGHT_DIM, W_BRIGHT_LIFE};
@@ -2295,6 +2303,7 @@ static void handleSave() {
   d.rotate = web.hasArg("rotate");
   long rotsec = web.arg("rotsec").toInt();
   if (rotsec >= MIN_ROTATE_S && rotsec <= MAX_ROTATE_S) d.rotateSec = rotsec;
+  d.rotateAll = web.hasArg("rotall");
   long nf = web.arg("nfrom").toInt(), nt = web.arg("nto").toInt();
   if (nf >= 0 && nf < 24) d.nightFrom = nf;
   if (nt >= 0 && nt < 24) d.nightTo = nt;
@@ -2737,6 +2746,7 @@ static bool showStatus, sortByDist;
 static uint32_t buttonHeldMs;        // how long the button has been held right now (0 = released)
 static uint32_t lastActivity;        // last button press or new spot (saver)
 static bool wakeSwallow;             // the press that woke the display does nothing else
+static bool nightAwake;              // dark night: a button press has woken the display until the saver time runs out
 static uint8_t mapMode;
 static uint32_t screenSince;
 static char flashText[24];
@@ -3151,6 +3161,26 @@ static void fbShift(int dx, int dy) {
       if (src[((y - dy) >> 3) * 128 + x - dx] & (1 << ((y - dy) & 7))) setPixel(x, y);
 }
 
+// True when a spot younger than SPOT_WINDOW_MIN is on record: the same test as the spot lists use.
+static bool hasRecentSpot() {
+  uint32_t nowUnix = timeValid() ? time(nullptr) : 0, nowMs = millis();
+  lock();
+  bool any = false;
+  for (int i = 0; i < spotCount && !any; i++) any = spotAge(spots[i], nowUnix, nowMs) < SPOT_WINDOW_MIN * 60u;
+  unlock();
+  return any;
+}
+
+// Automatic switching goes on to the next screen after `from`. Without spots (and without the Advanced
+// "all screens" option) only the clock and the propagation screen take part; the spot screens stay reachable by hand.
+static int nextRotationScreen(int from, bool allScreens) {
+  for (int k = 1; k <= SCREEN_COUNT; k++) {
+    int s = (from + k) % SCREEN_COUNT;
+    if (allScreens || s == S_CLOCK || s == S_SOLAR) return s;
+  }
+  return from;
+}
+
 // ---- button: short press, double click, triple click, long press, 10 s hold ----
 // The long press fires once while still held; setup follows after 10 s.
 
@@ -3218,10 +3248,18 @@ static void handleButton(uint32_t now) {
   bool pressStart = buttonHeldMs && !held;
   held = buttonHeldMs != 0;
   if ((pressStart || e != BTN_NONE) && asleep) wakeSwallow = true;
+  if ((pressStart || e != BTN_NONE) && nightDark()) nightAwake = true;   // the button wakes the display even in the dark night
+  // Automatic switching without spots: the press that wakes the display shows the clock, which then switches
+  // with the propagation screen.
+  if (pressStart && asleep && cfg.rotate && !cfg.rotateAll && !hasRecentSpot()) {
+    screen = S_CLOCK;
+    showStatus = false;
+    screenSince = now;
+  }
   if (buttonHeldMs || e != BTN_NONE) lastActivity = now;
   if (e == BTN_CONFIG) {
     wakeSwallow = false;
-  } else if (e != BTN_NONE && (wakeSwallow || nightDark())) {
+  } else if (e != BTN_NONE && wakeSwallow) {
     wakeSwallow = false;
     return;
   }
@@ -3331,8 +3369,10 @@ static void saverService(uint32_t now) {
     }
   }
   bool idle = cfg.saverMin && now - lastActivity >= cfg.saverMin * 60000UL;
+  // Dark night: the display stays off, but a button press wakes it until the saver time runs out again.
+  if (!nightDark() || idle) nightAwake = false;
   bool was = asleep;
-  asleep = !busy && (idle || nightDark() || saverForced);
+  asleep = !busy && (idle || (nightDark() && !nightAwake) || saverForced);
   if (asleep && !was) {
     lifeReset(esp_random());
     Serial.println("Screen saver: on");
@@ -3422,7 +3462,7 @@ void loop() {
   }
 
   if (cfg.rotate && !portalMode && !showStatus && wiz == WZ_OFF && now - screenSince >= cfg.rotateSec * 1000UL) {
-    screen = (screen + 1) % SCREEN_COUNT;
+    screen = nextRotationScreen(screen, cfg.rotateAll || hasRecentSpot());
     screenSince = now;
   }
   if ((int32_t)(now - nextFrame) >= 0) {

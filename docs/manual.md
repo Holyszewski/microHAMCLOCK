@@ -167,7 +167,9 @@ of inactivity (10 min by default):
   up on the spot list and stays on as long as spots keep coming. Only spots
   younger than 15 minutes wake it, late reports don't.
 - The first button press only wakes the display and doesn't switch
-  anything. Holding it for 10 s to enter setup always works.
+  anything, with one exception: when rotation runs without spots (see
+  above), the press wakes the display on the clock, and rotation goes on
+  from there. Holding it for 10 s to enter setup always works.
 - The built-in LED flashes once for 0.5 s when a spot wakes the display.
   This option is on by default, you can turn it off on the web page or in
   the console, and it applies to all three screen savers. Once
@@ -180,13 +182,22 @@ of inactivity (10 min by default):
 
 At night (22–06 local time by default) the display is dimmed and, depending
 on the setting: `button` = only the button wakes it, `spots` = spots wake
-it too (default), `dark` = it stays off. The same hour for start and end
-means no night.
+it too (default), `dark` = it stays off, spots don't light it. With `dark`
+the button still lights it: it stays on until the screen saver time
+(set above) runs out without a press, or until the morning if that time is
+set to never. The same hour for start and end means no night.
 
 The setup page has a checkbox for automatic screen rotation (on by
 default; a double click on the button toggles it too). How many seconds
 each screen stays up (15 by default, 5–120) is in the **Advanced**
 section.
+
+Without any spot in the last hour, rotation goes only between the clock and
+the propagation screen: the spot list and the spot map are not shown
+automatically, but you can still reach them with the button. As soon as a
+spot comes in, rotation goes through all four screens again. The
+**Advanced** option "without spots, switch all screens too" keeps all four
+in rotation even with no spots (off by default).
 
 You can change the display brightness for day, night and both screen
 savers on the web page, in the **Advanced** section (in percent). When you
@@ -309,6 +320,15 @@ leave it first.
   the station in use is on the status screen; you can enter a different
   station in Advanced. Fresh data is available in Europe, the Americas,
   South Africa and Australia; in Asia there is almost none at the moment.
+  The measurements are made by the observatories of the GIRO network (Lowell
+  GIRO Data Center, University of Massachusetts Lowell; contacts in its
+  [Acknowledgements List](https://giro.uml.edu/didbase/acknowledgements.html))
+  and republished by KC2G. GIRO data is released under CC BY-NC-SA 4.0
+  ([Rules of the Road](https://giro.uml.edu/didbase/RulesOfTheRoad.html)).
+  Source: Reinisch, B. W., and I. A. Galkin, *Global Ionospheric Radio
+  Observatory (GIRO)*, Earth, Planets and Space, 63, 377–381 (2011),
+  [doi:10.5047/eps.2011.03.001](https://doi.org/10.5047/eps.2011.03.001),
+  <http://spase.info/SMWG/Observatory/GIRO>.
 - **NVIS** – the recommended band is the highest band (160–20 m) whose
   lower edge lies below foF2 reduced by the margin from Advanced.
 - **Propagation** – XML from N0NBH, `https://www.hamqsl.com/solarxml.php`,

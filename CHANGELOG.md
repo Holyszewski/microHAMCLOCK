@@ -7,6 +7,19 @@ releases are listed in the Unreleased section.
 
 ## Unreleased
 
+- Docs: README and the manual now acknowledge the GIRO network and its
+  observatories as the ionosonde data asks (citation, link, license).
+- Changed: without any spot in the last hour, automatic screen switching
+  goes only between the clock and the propagation screen. The spot list and
+  the spot map are still reached with the button. As soon as a spot comes in,
+  all four screens rotate again.
+- Changed: with the screen saver on and no spots, the first button press
+  wakes the display on the clock.
+- Changed: in the "dark" night mode a button press lights the display again
+  (until the screen saver time runs out), while new spots still don't.
+  Before, the button did nothing at night in that mode.
+- Added: Advanced option "without spots, switch all screens too" (off by
+  default) keeps all four screens in rotation even with no spots.
 - Changed: the ionosonde data (KC2G) is downloaded every 15 minutes, not
   every 10, which halves its load on the server; the data stays well inside
   the 90-minute limit.
