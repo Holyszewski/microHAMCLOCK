@@ -5,7 +5,7 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
-## Unreleased
+## 0.11.0 – 2026-10-11
 
 - Docs: README and the manual now acknowledge the GIRO network and its
   observatories as the ionosonde data asks (citation, link, license).
