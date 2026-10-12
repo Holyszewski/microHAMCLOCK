@@ -5,6 +5,10 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
+## 0.11.3 – 2026-10-12
+
+- Small tweak to the spot list display.
+
 ## 0.11.2 – 2026-10-12
 
 - Fix: on the map a new, blinking spot could be hidden under an older one
