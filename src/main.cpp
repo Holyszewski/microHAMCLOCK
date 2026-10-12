@@ -2960,8 +2960,15 @@ static void renderPskList() {
     const Spot &s = snap[k];
     int y = 11 + i * 9;
     char buf[12];
+    baseCall(s.call, buf, sizeof buf);
+    bool author = !strcasecmp(buf, "OK2MTB");   // the author heard you: the call is inverted, like GOOD on the propagation screen
     strlcpy(buf, s.call, 10);
-    drawText(buf, 0, y);
+    if (author) {
+      fillRect(0, y - 1, textWidth(buf) + 3, 9);
+      drawText(buf, 1, y, 1, false);
+    } else {
+      drawText(buf, 0, y);
+    }
     bandLabel(s.band, buf);
     drawTextRight(buf, 72, y);
     snprintf(buf, sizeof buf, "%+d", s.snr);
