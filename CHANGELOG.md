@@ -5,7 +5,7 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
-## Unreleased
+## 0.12.0 – 2026-10-14
 
 - New: the battery voltage (for example `4.20V`) is shown on the status
   screen, bottom row, one space before the version. It is not shown without
