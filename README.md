@@ -106,7 +106,7 @@ One button, **PRG**:
 |---|---|
 | Short | next screen |
 | Double | automatic screen switching on/off (15 s per screen by default) |
-| Triple | status screen (Wi-Fi, IP, MQTT, data age, version) |
+| Triple | status screen (Wi-Fi, IP, MQTT, data age, battery voltage, version) |
 | Long (0.7 s) | list: sort by time or distance · map: AUTO → WORLD → EUROPE (→ CZECHIA → GERMANY → UK → USA, when switched on) · status screen: power off (**RST** starts the board again) |
 | Hold 10 s | setup mode (hotspot) |
 
@@ -143,7 +143,8 @@ pio device monitor                    # serial console, 115200 baud
 ```
 
 The serial console understands `setup` (a step-by-step setup wizard), `status`, `snapshot`
-(a screen dump; `python tools/snapshot.py COM4 screen.png` turns it into a PNG), `blink` and
+(a screen dump; `python tools/snapshot.py COM4 screen.png` turns it into a PNG), `blink`,
+`screen <name>` (shows a screen on the display) and
 `saver [off|life|dim]` (the screen saver right away) and `off` (power off).
 `python tools/build_site.py --serve` builds the web installer and serves it on localhost.
 

@@ -241,7 +241,8 @@ automatically by default; you can also pick V3 / V3.1 or V3.2 by hand
 (the version is printed on the board). It only matters for measuring the
 battery voltage, because V3.2 switches the measurement on the other way
 round. The `status` command prints the version in use and the battery
-voltage. The voltage means little on USB or without a cell: a board
+voltage, and the status screen shows the voltage too (bottom row, before the
+version). The voltage means little on USB or without a cell: a board
 without a cell reads about 3.2 V.
 
 **Factory reset**, the red button at the very bottom of **Advanced**,
@@ -257,6 +258,7 @@ Other console commands:
 | `status`   | prints the settings (time zone, screen rotation, screen saver, Game of Life limit, night, brightness, NVIS, country maps, ionosonde choice), board version, battery voltage, Wi-Fi, time, MQTT, spot count and propagation data (formerly `stav`, which still works) |
 | `snapshot` | prints the display contents; `python tools/snapshot.py COM4 screen.png` turns them into a PNG (formerly `snimek`, which still works) |
 | `blink`    | switches to the propagation screen and demonstrates the flash, as if new data had arrived |
+| `screen`   | shows a screen on the display: `screen clock`, `screen propagation`, `screen list`, `screen map` or `screen status`. Handy when you can't reach the button |
 | `off`      | powers the board off, like the long press on the status screen (see Controls) |
 | `factory`  | factory reset: erases all settings, Wi-Fi included, and restarts in setup mode. It asks first; type `yes` to confirm |
 | `saver`    | turns the screen saver on right away: `saver` the one you set, `saver off`, `saver life` or `saver dim` a given one. The settings don't change; the button, or a spot when spots may wake the display, ends it as usual. Handy for trying the savers and the LED flash on a spot without waiting |
@@ -290,7 +292,7 @@ otherwise the whole world.
 |-----------|--------------------------------------------------------------|
 | short     | next screen                                                  |
 | double    | automatic screen rotation on/off (15 s per screen, set on the web) |
-| triple    | status screen (Wi-Fi, IP, MQTT, data age, version)           |
+| triple    | status screen (Wi-Fi, IP, MQTT, data age, battery voltage, version) |
 | long (0.7 s, fires while still held) | list: sort by time / distance; map: AUTO → WORLD → EUROPE → CZECHIA → GERMANY → UK → USA (only the switched-on countries); status screen: power off |
 | hold 10 s | setup mode (hotspot), see Setup                              |
 

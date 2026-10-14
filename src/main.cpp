@@ -633,6 +633,8 @@ static uint32_t saverForcedAt;
 static volatile uint32_t spotWakeAt;   // millis of the last fresh spot (wakes the display), 0 = none
 static volatile uint32_t propagationSeq;   // increments when new propagation data arrives (N0NBH or ionosonde)
 static uint32_t blinkTestAt;               // "blink" command: pretend new data at this moment, 0 = none
+static int screenCmd = -1;                 // "screen" command: the screen to show (a Screen value, or SCREEN_STATUS), -1 = none
+static const int SCREEN_STATUS = 100;
 
 static uint32_t spotAge(const Spot &s, uint32_t nowUnix, uint32_t nowMs) {
   if (nowUnix && s.t && nowUnix >= s.t) return nowUnix - s.t;
@@ -2696,6 +2698,20 @@ static void saverCommand(char *arg) {
                 NAME[mode >= 0 ? mode : cfg.saverMode]);
 }
 
+// "screen clock|propagation|list|map|status": shows that screen on the display (the button does it too, but
+// not when nobody is near the board). Settings don't change; loop() does the switch.
+static void screenCommand(const char *arg) {
+  while (*arg == ' ') arg++;
+  static const char *const NAME[] = {"clock", "propagation", "list", "map", "status"};
+  for (int i = 0; i < 5; i++)
+    if (!strcasecmp(arg, NAME[i])) {
+      screenCmd = i < 4 ? i : SCREEN_STATUS;
+      Serial.printf("Screen: %s\n", NAME[i]);
+      return;
+    }
+  Serial.println("Usage: screen clock|propagation|list|map|status");
+}
+
 static bool factoryAsked;           // "factory" was typed, the next line confirms it
 
 // Commands are in English; the original Czech ones (stav, snimek) still work.
@@ -2720,6 +2736,7 @@ static void serialService() {
   else if (!strcasecmp(line, "status") || !strcasecmp(line, "stav")) printStatus();
   else if (!strcasecmp(line, "snapshot") || !strcasecmp(line, "snimek")) printScreenshot();
   else if (!strcasecmp(line, "blink"))                               blinkTestAt = (millis() + 1000) | 1;
+  else if (!strncasecmp(line, "screen", 6) && (!line[6] || line[6] == ' ')) screenCommand(line + 6);
   else if (!strncasecmp(line, "saver", 5) && (!line[5] || line[5] == ' ')) saverCommand(line + 5);
   else if (!strcasecmp(line, "off"))                                 powerOff(false, true);
   else if (!strcasecmp(line, "factory")) {
@@ -2728,7 +2745,8 @@ static void serialService() {
     Serial.println("Type yes to erase everything, anything else cancels:");
   }
   else if (line[0]) Serial.println("Commands: setup = settings, status = what is going on, snapshot = screen dump, "
-                                   "blink = test the propagation screen blink, saver [off|life|dim] = screen saver now, "
+                                   "blink = test the propagation screen blink, screen <name> = show a screen, "
+                                   "saver [off|life|dim] = screen saver now, "
                                    "off = power off (RST starts again), factory = erase all settings");
 }
 
@@ -3129,7 +3147,12 @@ static void renderStatus() {
   snprintf(buf, sizeof buf, tr(S_UPTIME), (unsigned long)(min / 60), (unsigned long)(min % 60));
   drawText(buf, 0, 48);
   drawText(timeValid() ? "NTP OK" : "NTP --", 0, 57);
-  snprintf(buf, sizeof buf, "v%s", FW_VERSION_OLED);  // it would not fit next to the callsign in the header
+  // The version bottom right (it would not fit next to the callsign in the header), the battery voltage one
+  // space before it. A long version overlaps NTP OK; that is accepted, it happens only in development builds.
+  if (batteryPresent(batteryMv))
+    snprintf(buf, sizeof buf, "%u.%02uV v%s", batteryMv / 1000, batteryMv % 1000 / 10, FW_VERSION_OLED);
+  else
+    snprintf(buf, sizeof buf, "v%s", FW_VERSION_OLED);
   drawTextRight(buf, 127, 57);
 }
 
@@ -3475,6 +3498,13 @@ void loop() {
       blinkTestAt = 0;
       propagationSeq++;
     }
+  }
+
+  if (screenCmd >= 0 && !portalMode && wiz == WZ_OFF) {   // console: show the screen asked for
+    showStatus = screenCmd == SCREEN_STATUS;
+    if (!showStatus) screen = screenCmd;
+    screenCmd = -1;
+    screenSince = lastActivity = now;
   }
 
   // New propagation data: the propagation screen briefly inverts, but only when it is showing.

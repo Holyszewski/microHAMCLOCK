@@ -5,6 +5,14 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
+## Unreleased
+
+- New: the battery voltage (for example `4.20V`) is shown on the status
+  screen, bottom row, one space before the version. It is not shown without
+  a cell. A long development version (`v0.11.12+13`) may overlap `NTP OK`.
+- New: the console command `screen clock|propagation|list|map|status` shows
+  a screen on the display, for a board you can't reach to press its button.
+
 ## 0.11.3 – 2026-10-12
 
 - Small tweak to the spot list display.
