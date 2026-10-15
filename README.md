@@ -142,23 +142,20 @@ pio run -t upload --upload-port COM4  # flash
 pio device monitor                    # serial console, 115200 baud
 ```
 
-The serial console understands `setup` (a step-by-step setup wizard), `status`, `snapshot`
-(a screen dump; `python tools/snapshot.py COM4 screen.png` turns it into a PNG), `blink`,
-`screen <name>` (shows a screen on the display) and
-`saver [off|life|dim]` (the screen saver right away) and `off` (power off).
-`python tools/build_site.py --serve` builds the web installer and serves it on localhost.
+The source layout, the console commands for testing, the map generator and the other tools are
+described in [docs/development.md](docs/development.md).
 
 ## Translations
 
-Display and web texts live in `src/lang/<code>.inc`, with `en.inc` as the master. To add a language,
-copy `en.inc`, translate it, register the language in `src/i18n.h` and `src/i18n.cpp`, and run
-`python tools/check_lang.py`. Display texts must be ASCII, because the OLED font has no accents.
-Pull requests with new languages are very welcome (see [Contributing](CONTRIBUTING.md)).
+Display and web texts live in `src/lang/<code>.inc`, so a new language is mostly one file to
+translate. Pull requests with new languages are very welcome; the steps are in
+[CONTRIBUTING.md](CONTRIBUTING.md#translations).
 
 ## Documentation
 
-- [Full manual](docs/manual.md): setup over USB, screen saver and night mode, advanced settings,
-  details on every data source.
+- [Manual](docs/manual.md): installing, setup, screens, controls, screen saver and night mode,
+  advanced settings, troubleshooting, data sources.
+- [Development](docs/development.md): building from source, how it fits together, tools.
 - [Changelog](CHANGELOG.md)
 
 ## About the name

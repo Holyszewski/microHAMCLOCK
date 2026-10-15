@@ -5,6 +5,13 @@ up with a new feature, `y` with a fix. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
+## Unreleased
+
+- Docs: the manual is now for users only, reordered (installing, setup,
+  screens, controls, settings, troubleshooting) and with a troubleshooting
+  section. Building from source and the inner workings moved to the new
+  `docs/development.md`, adding a language to `CONTRIBUTING.md`.
+
 ## 0.12.0 – 2026-10-14
 
 - New: the battery voltage (for example `4.20V`) is shown on the status
