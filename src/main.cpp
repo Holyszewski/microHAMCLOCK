@@ -126,14 +126,18 @@ static const uint16_t    IONO_MAX_KM      = 1500; // a more distant ionosonde sa
 static const uint16_t    IONO_STICKY_KM   = 300;  // the current ionosonde stays unless it is this much farther than the nearest
 
 // Battery (a Li-ion cell on the JST connector). The board charges it but never disconnects it when flat.
-// The automatic power off is ready but switched off: the board cannot tell whether USB is plugged in,
-// and without a cell the charger output reads as a flat cell (a steady 3.20 V on a V3.1 on USB).
+// The automatic power off is ready but switched off: the board cannot tell whether USB is plugged in.
+// Without a cell the charger output is measured instead, about 4 V (one random V3 on USB: 4.13 V on the
+// connector, read as 3.95 V; other boards will differ a little).
 static const bool     BAT_AUTO_OFF      = false;   // power off on a flat battery
 static const uint16_t BAT_CHECK_S       = 30;      // how often the voltage is measured
 static const uint16_t BAT_NONE_MV       = 2500;    // lower readings mean no cell (but a missing cell may read higher)
 static const uint16_t BAT_OFF_MV        = 3300;    // flat (under load), BAT_OFF_COUNT readings in a row
 static const uint8_t  BAT_OFF_COUNT     = 4;
-static const uint16_t BAT_ON_MV         = 3600;    // after a power off for a flat battery: charged enough to run
+// After a power off for a flat battery: false = sleep until RST, like the manual power off (lowest draw);
+// true = wake every BAT_RECHECK_MIN and start again once the cell is charged to BAT_ON_MV.
+static const bool     BAT_FLAT_RECHECK  = false;
+static const uint16_t BAT_ON_MV         = 3600;    // charged enough to run (with BAT_FLAT_RECHECK)
 static const uint16_t BAT_RECHECK_MIN   = 30;      // ... checked this often from deep sleep
 
 // ============================ HARDWARE ============================
@@ -716,7 +720,7 @@ static void mqttSetState(MqttState s) {
 }
 
 static void mqttDrop(const char *why) {
-  if (mqttState != MS_IDLE && !quietLog) Serial.printf("MQTT: disconnected (%s)\n", why);
+  if (mqttState != MS_IDLE && !quietLog) Serial.printf("MQTT: disconnected (%s)\r\n", why);
   mqttNet.stop();
   mqttSetState(MS_IDLE);
   mqttNextTry = millis() + jittered(mqttBackoff);
@@ -788,7 +792,7 @@ static void mqttSubscribe() {
     strcpy(topic + t, "/#");
     n += putStr(body + n, topic);
     body[n++] = 0;                  // QoS 0
-    if (!quietLog) Serial.printf("MQTT: subscribing to %s\n", topic);
+    if (!quietLog) Serial.printf("MQTT: subscribing to %s\r\n", topic);
   }
   mqttSend(0x82, body, n);
   mqttSetState(MS_WAIT_SUBACK);
@@ -843,7 +847,7 @@ static void handleSpot(const char *js) {
   // Only fresh spots wake: some programs send reports delayed by even hours.
   uint32_t nowUnix = timeValid() ? time(nullptr) : 0;
   if (!nowUnix || !s.t || nowUnix < s.t + SPOT_WAKE_MAX_AGE_MIN * 60u) spotWakeAt = millis() | 1;
-  if (!quietLog) Serial.printf("Spot: %s %s %+d dB %u km\n", s.call, s.band, s.snr, s.km);
+  if (!quietLog) Serial.printf("Spot: %s %s %+d dB %u km\r\n", s.call, s.band, s.snr, s.km);
 }
 
 static void mqttPacket(uint8_t type, const uint8_t *p, uint32_t len) {
@@ -935,7 +939,7 @@ static bool httpsGet(const char *url, const char *what, String &out) {
   int code = http.GET();
   if (code == 200) out = http.getString();
   http.end();
-  if (code != 200 && !quietLog) Serial.printf("%s: HTTP %d\n", what, code);
+  if (code != 200 && !quietLog) Serial.printf("%s: HTTP %d\r\n", what, code);
   return code == 200 && out.length();
 }
 
@@ -987,7 +991,7 @@ static bool fetchSolar() {
     strcpy(lastUpdated, updated);
     propagationSeq++;
   }
-  if (!quietLog) Serial.printf("Propagation: SFI %s SN %s A %s K %s X %s\n", s.sfi, s.sn, s.a, s.k, s.xray);
+  if (!quietLog) Serial.printf("Propagation: SFI %s SN %s A %s K %s X %s\r\n", s.sfi, s.sn, s.a, s.k, s.xray);
   return true;
 }
 
@@ -1098,9 +1102,9 @@ static bool fetchIono() {           // called only with valid time
   if (kept.ok && kept.km <= best.km + IONO_STICKY_KM) best = kept;
   if (!best.ok) {
     if (quietLog) return true;
-    if (!manual)      Serial.printf("Ionosonde: none with a fresh measurement within %u km\n", IONO_MAX_KM);
-    else if (!listed) Serial.printf("Ionosonde %s: not in the data\n", cfg.iono);
-    else              Serial.printf("Ionosonde %s: no fresh measurement\n", cfg.iono);
+    if (!manual)      Serial.printf("Ionosonde: none with a fresh measurement within %u km\r\n", IONO_MAX_KM);
+    else if (!listed) Serial.printf("Ionosonde %s: not in the data\r\n", cfg.iono);
+    else              Serial.printf("Ionosonde %s: no fresh measurement\r\n", cfg.iono);
     return true;
   }
   lock();
@@ -1112,7 +1116,7 @@ static bool fetchIono() {           // called only with valid time
     time_t t = best.measuredAt;
     struct tm u;
     gmtime_r(&t, &u);
-    Serial.printf("Ionosonde %s (%s, %u km): foF2 %.1f MHz, MUF %.1f MHz (%02d:%02d UTC)\n", best.code, best.name,
+    Serial.printf("Ionosonde %s (%s, %u km): foF2 %.1f MHz, MUF %.1f MHz (%02d:%02d UTC)\r\n", best.code, best.name,
                   best.km, best.fof2, best.mufd, u.tm_hour, u.tm_min);
   }
   return true;
@@ -1145,7 +1149,7 @@ static void onTimeSync(struct timeval *tv) {   // called by SNTP after each sync
   time_t t = tv->tv_sec;
   struct tm u;
   gmtime_r(&t, &u);
-  Serial.printf("NTP: time set, %02d:%02d:%02d UTC\n", u.tm_hour, u.tm_min, u.tm_sec);
+  Serial.printf("NTP: time set, %02d:%02d:%02d UTC\r\n", u.tm_hour, u.tm_min, u.tm_sec);
 }
 
 // Why connecting fails (from the disconnect event reason code), so the display can say so.
@@ -1157,7 +1161,7 @@ static void onWifiDisconnect(WiFiEvent_t, WiFiEventInfo_t info) {
                r == WIFI_REASON_HANDSHAKE_TIMEOUT || r == WIFI_REASON_AUTH_EXPIRE ? WF_AUTH
              : WF_OTHER;
   if (f != wifiFailSeen && !quietLog)
-    Serial.printf("WiFi: cannot connect to %s (%s, code %u)\n", cfg.ssid, WIFI_FAIL_LOG[f], r);
+    Serial.printf("WiFi: cannot connect to %s (%s, code %u)\r\n", cfg.ssid, WIFI_FAIL_LOG[f], r);
   wifiFailSeen = f;
 }
 
@@ -1190,7 +1194,7 @@ static void netTask(void *) {
         nextIono = now + esp_random() % START_SPREAD_MS;
       }
       if (!quietLog) {
-        if (up) Serial.printf("WiFi: connected, IP %s\n", WiFi.localIP().toString().c_str());
+        if (up) Serial.printf("WiFi: connected, IP %s\r\n", WiFi.localIP().toString().c_str());
         else    Serial.println("WiFi: disconnected");
       }
     }
@@ -1315,8 +1319,9 @@ static void releasePinHolds() {
   gpio_deep_sleep_hold_dis();
 }
 
-// Turns everything off and goes to deep sleep. flat = the battery is flat: then the board wakes every
-// BAT_RECHECK_MIN to check whether it has been charged. show = say so on the display first.
+// Turns everything off and goes to deep sleep. flat = the battery is flat: with BAT_FLAT_RECHECK the board
+// then wakes every BAT_RECHECK_MIN to check whether it has been charged, otherwise only RST starts it, as
+// after the manual power off. show = say so on the display first.
 static void powerOff(bool flat, bool show) {
   if (show) {
     memset(fb, 0, sizeof fb);
@@ -1343,7 +1348,7 @@ static void powerOff(bool flat, bool show) {
   holdPin(PIN_LORA_NSS, true);      // a falling NSS would wake the radio
   holdPin(PIN_LORA_RST, true);
   gpio_deep_sleep_hold_en();
-  if (flat) esp_sleep_enable_timer_wakeup(BAT_RECHECK_MIN * 60ULL * 1000000ULL);
+  if (flat && BAT_FLAT_RECHECK) esp_sleep_enable_timer_wakeup(BAT_RECHECK_MIN * 60ULL * 1000000ULL);
   esp_deep_sleep_start();
 }
 
@@ -1360,7 +1365,7 @@ static void factoryReset() {
   WiFi.mode(WIFI_OFF);
   prefs.end();
   esp_err_t err = nvs_flash_erase();
-  if (err != ESP_OK) Serial.printf("Factory reset: erase failed (%s)\n", esp_err_to_name(err));
+  if (err != ESP_OK) Serial.printf("Factory reset: erase failed (%s)\r\n", esp_err_to_name(err));
   Serial.flush();
   delay(800);
   ESP.restart();
@@ -1378,9 +1383,10 @@ static void batteryService(uint32_t now) {
   if (lowCount >= BAT_OFF_COUNT) powerOff(true, true);
 }
 
-// After a power off for a flat battery the timer wakes the board: back to sleep unless it was charged.
+// After a power off for a flat battery the timer wakes the board (BAT_FLAT_RECHECK): back to sleep unless it
+// was charged.
 static void batteryBootCheck() {
-  if (!BAT_AUTO_OFF || esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_TIMER) return;
+  if (!BAT_AUTO_OFF || !BAT_FLAT_RECHECK || esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_TIMER) return;
   uint16_t mv = readBatteryMv();
   if (batteryPresent(mv) && mv < BAT_ON_MV) powerOff(true, false);
 }
@@ -1475,17 +1481,17 @@ static void wizPrompt() {
       break;
     case WZ_CONFIRM:
       Serial.println();
-      Serial.printf("  Language:     %s\n", langInfo(cfgLang(draft)).nameAscii);
-      Serial.printf("  Wi-Fi:        %s (%s)\n", draft.ssid, draft.pass[0] ? "with password" : "no password");
-      Serial.printf("  Callsign:     %s\n", draft.call);
-      Serial.printf("  Locator:      %s\n", draft.loc[0] ? draft.loc : "-");
-      Serial.printf("  Time zone:    %s\n", draft.tz);
-      if (draft.saverMin) Serial.printf("  Screen saver: %s after %u min, new spot %s\n", SAVER_CODE[draft.saverMode],
+      Serial.printf("  Language:     %s\r\n", langInfo(cfgLang(draft)).nameAscii);
+      Serial.printf("  Wi-Fi:        %s (%s)\r\n", draft.ssid, draft.pass[0] ? "with password" : "no password");
+      Serial.printf("  Callsign:     %s\r\n", draft.call);
+      Serial.printf("  Locator:      %s\r\n", draft.loc[0] ? draft.loc : "-");
+      Serial.printf("  Time zone:    %s\r\n", draft.tz);
+      if (draft.saverMin) Serial.printf("  Screen saver: %s after %u min, new spot %s\r\n", SAVER_CODE[draft.saverMode],
                                         draft.saverMin, draft.wakeOnSpot ? "wakes it" : "does not wake it");
       else                Serial.println("  Screen saver: never");
-      Serial.printf("  Spot wake LED: %s\n", draft.ledOnSpotWake ? "on" : "off");
+      Serial.printf("  Spot wake LED: %s\r\n", draft.ledOnSpotWake ? "on" : "off");
       if (draft.nightFrom != draft.nightTo)
-        Serial.printf("  Night:        %u-%u, %s\n", draft.nightFrom, draft.nightTo, NIGHT_CODE[draft.nightMode]);
+        Serial.printf("  Night:        %u-%u, %s\r\n", draft.nightFrom, draft.nightTo, NIGHT_CODE[draft.nightMode]);
       else
         Serial.println("  Night:        none");
       Serial.print("Save and restart? (y/n): ");
@@ -1529,7 +1535,7 @@ static void wizInput(char *in) {
         else {
           char codes[32];
           langCodes(codes, sizeof codes);
-          Serial.printf("Unknown language, choose one of: %s\n", codes);
+          Serial.printf("Unknown language, choose one of: %s\r\n", codes);
         }
       }
       break;
@@ -1572,9 +1578,9 @@ static void wizInput(char *in) {
           for (size_t i = 0; i < tzZoneCount(); i++) {
             char label[96];
             tzLabel(tzZone(i), label, sizeof label);
-            Serial.printf("  %-22s %s\n", tzZone(i).id, label);
+            Serial.printf("  %-22s %s\r\n", tzZone(i).id, label);
           }
-          Serial.printf("  or a fixed offset UTC%+d ... UTC%+d (no daylight saving time)\n", TZ_FIXED_MIN, TZ_FIXED_MAX);
+          Serial.printf("  or a fixed offset UTC%+d ... UTC%+d (no daylight saving time)\r\n", TZ_FIXED_MIN, TZ_FIXED_MAX);
           ok = false;
           break;
         }
@@ -1582,10 +1588,10 @@ static void wizInput(char *in) {
         int found = tzSearch(in, id, sizeof id);
         if (found == 1) {
           strlcpy(draft.tz, id, sizeof draft.tz);
-          Serial.printf("Time zone: %s\n", draft.tz);
+          Serial.printf("Time zone: %s\r\n", draft.tz);
         } else if (found > 1) {
           Serial.println("More time zones match, be more specific:");
-          tzSearch(in, nullptr, 0, [](const char *zid, const char *cities) { Serial.printf("  %-22s %s\n", zid, cities); });
+          tzSearch(in, nullptr, 0, [](const char *zid, const char *cities) { Serial.printf("  %-22s %s\r\n", zid, cities); });
           ok = false;
         } else {
           Serial.println("Unknown time zone. Type a city, a UTC offset like UTC+3, or 'list'.");
@@ -1599,7 +1605,7 @@ static void wizInput(char *in) {
         long m = strtol(in, &end, 10);
         ok = !*end && m >= 0 && m <= MAX_SAVER_MIN;
         if (ok) draft.saverMin = m;
-        else Serial.printf("Enter 0 to %u minutes.\n", MAX_SAVER_MIN);
+        else Serial.printf("Enter 0 to %u minutes.\r\n", MAX_SAVER_MIN);
       }
       break;
     case WZ_SAVER_MODE:
@@ -1669,43 +1675,43 @@ static void wizInput(char *in) {
 
 static void printStatus() {
   Serial.println();
-  Serial.printf("microHAMCLOCK %s\n", FW_VERSION);
-  Serial.printf("Callsign %s, locator %s, display language %s\n", cfg.call[0] ? cfg.call : "-",
+  Serial.printf("microHAMCLOCK %s\r\n", FW_VERSION);
+  Serial.printf("Callsign %s, locator %s, display language %s\r\n", cfg.call[0] ? cfg.call : "-",
                 cfg.loc[0] ? cfg.loc : "-", langInfo(language()).nameAscii);
-  Serial.printf("Time zone %s (%s)\n", cfg.tz, tzRule);
-  if (cfg.rotate) Serial.printf("Screen rotation: on, every %u s, without spots %s\n", cfg.rotateSec,
+  Serial.printf("Time zone %s (%s)\r\n", cfg.tz, tzRule);
+  if (cfg.rotate) Serial.printf("Screen rotation: on, every %u s, without spots %s\r\n", cfg.rotateSec,
                                 cfg.rotateAll ? "all screens" : cfg.rotateMap ? "clock, propagation and map" : "clock and propagation only");
   else            Serial.println("Screen rotation: off");
   if (cfg.saverMin)
-    Serial.printf("Screen saver: %s after %u min, new spot %s, now %s\n", SAVER_CODE[cfg.saverMode], cfg.saverMin,
+    Serial.printf("Screen saver: %s after %u min, new spot %s, now %s\r\n", SAVER_CODE[cfg.saverMode], cfg.saverMin,
                   cfg.wakeOnSpot ? "wakes it" : "does not wake it", asleep ? "on" : "off");
   else
     Serial.println("Screen saver: never");
-  Serial.printf("Spot wake LED: %s\n", cfg.ledOnSpotWake ? "on" : "off");
-  if (cfg.lifeOff) Serial.printf("Game of Life saver: display off after %u days\n", cfg.lifeDays);
+  Serial.printf("Spot wake LED: %s\r\n", cfg.ledOnSpotWake ? "on" : "off");
+  if (cfg.lifeOff) Serial.printf("Game of Life saver: display off after %u days\r\n", cfg.lifeDays);
   else             Serial.println("Game of Life saver: runs until woken");
   if (cfg.nightFrom != cfg.nightTo)
-    Serial.printf("Night: %u-%u, %s, now %s\n", cfg.nightFrom, cfg.nightTo, NIGHT_CODE[cfg.nightMode],
+    Serial.printf("Night: %u-%u, %s, now %s\r\n", cfg.nightFrom, cfg.nightTo, NIGHT_CODE[cfg.nightMode],
                   isNight() ? "night" : "day");
-  Serial.printf("Brightness: day %d %%, night %d %%, dim %d %%, life %d %%\n", contrastToPct(cfg.bright[BR_DAY]),
+  Serial.printf("Brightness: day %d %%, night %d %%, dim %d %%, life %d %%\r\n", contrastToPct(cfg.bright[BR_DAY]),
                 contrastToPct(cfg.bright[BR_NIGHT]), contrastToPct(cfg.bright[BR_DIM]), contrastToPct(cfg.bright[BR_LIFE]));
-  Serial.printf("NVIS: margin %u %% below foF2, 60 m %s\n", cfg.nvisMargin, cfg.nvis60 ? "on" : "off");
-  Serial.printf("Country maps: Czechia %s, Germany %s, UK %s, USA %s\n", cfg.mapCz ? "on" : "off",
+  Serial.printf("NVIS: margin %u %% below foF2, 60 m %s\r\n", cfg.nvisMargin, cfg.nvis60 ? "on" : "off");
+  Serial.printf("Country maps: Czechia %s, Germany %s, UK %s, USA %s\r\n", cfg.mapCz ? "on" : "off",
                 cfg.mapDe ? "on" : "off", cfg.mapUk ? "on" : "off", cfg.mapUs ? "on" : "off");
-  Serial.printf("Board: Heltec %s (%s)\n", boardName(), cfg.board == BD_AUTO ? "detected" : "set by hand");
+  Serial.printf("Board: Heltec %s (%s)\r\n", boardName(), cfg.board == BD_AUTO ? "detected" : "set by hand");
   if (batteryPresent(batteryMv))
-    Serial.printf("Battery: %u.%02u V, about %d %% (means little on USB or without a cell)\n", batteryMv / 1000,
+    Serial.printf("Battery: %u.%02u V, about %d %% (means little on USB or without a cell)\r\n", batteryMv / 1000,
                   batteryMv % 1000 / 10, batteryPercent(batteryMv));
   else
-    Serial.printf("Battery: none (%u mV)\n", batteryMv);
+    Serial.printf("Battery: none (%u mV)\r\n", batteryMv);
   if (!cfg.ssid[0]) Serial.println("WiFi: not set up (command setup)");
-  else if (wifiUp)  Serial.printf("WiFi: %s, IP %s, %d dBm\n", cfg.ssid, WiFi.localIP().toString().c_str(), WiFi.RSSI());
-  else              Serial.printf("WiFi: connecting to %s\n", cfg.ssid);
+  else if (wifiUp)  Serial.printf("WiFi: %s, IP %s, %d dBm\r\n", cfg.ssid, WiFi.localIP().toString().c_str(), WiFi.RSSI());
+  else              Serial.printf("WiFi: connecting to %s\r\n", cfg.ssid);
   if (timeValid()) {
     time_t t = time(nullptr);
     struct tm u;
     gmtime_r(&t, &u);
-    Serial.printf("Time: %02d:%02d:%02d UTC\n", u.tm_hour, u.tm_min, u.tm_sec);
+    Serial.printf("Time: %02d:%02d:%02d UTC\r\n", u.tm_hour, u.tm_min, u.tm_sec);
   } else {
     Serial.println("Time: waiting for NTP");
   }
@@ -1714,25 +1720,25 @@ static void printStatus() {
   Solar s = solar;
   Iono io = iono;
   unlock();
-  Serial.printf("MQTT: %s, spots in the last %d min: %d, received in total: %lu\n",
+  Serial.printf("MQTT: %s, spots in the last %d min: %d, received in total: %lu\r\n",
                 mqttUp ? "connected" : "not connected", SPOT_WINDOW_MIN, n, (unsigned long)spotsTotal);
-  if (s.ok) Serial.printf("Propagation: SFI %s SN %s A %s K %s X %s\n", s.sfi, s.sn, s.a, s.k, s.xray);
+  if (s.ok) Serial.printf("Propagation: SFI %s SN %s A %s K %s X %s\r\n", s.sfi, s.sn, s.a, s.k, s.xray);
   else      Serial.println("Propagation: no data yet");
-  if (cfg.iono[0]) Serial.printf("Ionosonde choice: %s (set by hand)\n", cfg.iono);
-  else             Serial.printf("Ionosonde choice: nearest with fresh data within %u km\n", IONO_MAX_KM);
+  if (cfg.iono[0]) Serial.printf("Ionosonde choice: %s (set by hand)\r\n", cfg.iono);
+  else             Serial.printf("Ionosonde choice: nearest with fresh data within %u km\r\n", IONO_MAX_KM);
   if (io.ok) {
     time_t t = io.measuredAt;
     struct tm u;
     gmtime_r(&t, &u);
-    Serial.printf("Ionosonde %s (%s, %u km): foF2 %.1f MHz, MUF %.1f MHz, measured %02d:%02d UTC%s\n", io.code, io.name,
+    Serial.printf("Ionosonde %s (%s, %u km): foF2 %.1f MHz, MUF %.1f MHz, measured %02d:%02d UTC%s\r\n", io.code, io.name,
                   io.km, io.fof2, io.mufd, u.tm_hour, u.tm_min, ionoFresh(io) ? "" : " (too old, not shown)");
     const char *nvis = nvisBand(io);
-    if (nvis) Serial.printf("Recommended NVIS band: %s m\n", nvis);
+    if (nvis) Serial.printf("Recommended NVIS band: %s m\r\n", nvis);
     else      Serial.println("Recommended NVIS band: none");
   } else {
     Serial.println("Ionosonde: no data yet");
   }
-  Serial.printf("Running %lu min, free memory %u B\n", (unsigned long)(millis() / 60000), (unsigned)ESP.getFreeHeap());
+  Serial.printf("Running %lu min, free memory %u B\r\n", (unsigned long)(millis() / 60000), (unsigned)ESP.getFreeHeap());
 }
 
 // Display contents as 64 hex lines (MSB = left pixel); tools/snapshot.py turns it into an image.
@@ -2353,7 +2359,7 @@ static void handleSave() {
     return;
   }
   saveConfig(d);
-  Serial.printf("Hotspot: saved (%s, %s, %s, %s, %s), restarting\n", d.ssid, d.call, d.loc, d.lang, d.tz);
+  Serial.printf("Hotspot: saved (%s, %s, %s, %s, %s), restarting\r\n", d.ssid, d.call, d.loc, d.lang, d.tz);
   char msg[400];
   snprintf(msg, sizeof msg, tr(W_SAVED, lang), htmlEscape(d.ssid).c_str());
   sendPage(lang, String("<p>") + msg + "</p>");
@@ -2461,7 +2467,7 @@ static void portalStart() {
   WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t) { Serial.println("Hotspot: a device connected"); },
                ARDUINO_EVENT_WIFI_AP_STACONNECTED);
   WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t info) {
-    Serial.printf("Hotspot: DHCP assigned %s\n", IPAddress(info.wifi_ap_staipassigned.ip.addr).toString().c_str());
+    Serial.printf("Hotspot: DHCP assigned %s\r\n", IPAddress(info.wifi_ap_staipassigned.ip.addr).toString().c_str());
   }, ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED);
   WiFi.mode(WIFI_AP_STA);           // STA part only for scanning networks
   uint8_t mac[6];
@@ -2494,7 +2500,7 @@ static void portalStart() {
   web.begin();
   startScan();
   portalSeenAt = millis();
-  Serial.printf("Setup mode: join Wi-Fi %s (no password) and open http://%s\n", apName,
+  Serial.printf("Setup mode: join Wi-Fi %s (no password) and open http://%s\r\n", apName,
                 PORTAL_IP.toString().c_str());
   Serial.println("Or type setup here in the console.");
 }
@@ -2647,7 +2653,7 @@ static void usbSave(const char *q) {
   }
   saveConfig(d);
   Serial.println("HC ok");
-  Serial.printf("USB setup: saved (%s, %s, %s, %s, %s), restarting\n", d.ssid, d.call, d.loc, d.lang, d.tz);
+  Serial.printf("USB setup: saved (%s, %s, %s, %s, %s), restarting\r\n", d.ssid, d.call, d.loc, d.lang, d.tz);
   restartSoon(500);
 }
 
@@ -2694,7 +2700,7 @@ static void saverCommand(char *arg) {
   saverForced = true;
   saverForcedAt = millis();
   static const char *const NAME[SV_MODE_COUNT] = {"display off", "Game of Life", "dim and shift"};
-  Serial.printf("Screen saver now (%s), until the button or a spot wakes the display\n",
+  Serial.printf("Screen saver now (%s), until the button or a spot wakes the display\r\n",
                 NAME[mode >= 0 ? mode : cfg.saverMode]);
 }
 
@@ -2706,7 +2712,7 @@ static void screenCommand(const char *arg) {
   for (int i = 0; i < 5; i++)
     if (!strcasecmp(arg, NAME[i])) {
       screenCmd = i < 4 ? i : SCREEN_STATUS;
-      Serial.printf("Screen: %s\n", NAME[i]);
+      Serial.printf("Screen: %s\r\n", NAME[i]);
       return;
     }
   Serial.println("Usage: screen clock|propagation|list|map|status");
@@ -3379,7 +3385,7 @@ void setup() {
   dataLock = xSemaphoreCreateMutex();
   delay(500);                       // give the USB bridge time to open the port
   Serial.println();
-  Serial.printf("microHAMCLOCK %s for Heltec V3. Commands: setup, status, snapshot\n", FW_VERSION);
+  Serial.printf("microHAMCLOCK %s for Heltec V3. Commands: setup, status, snapshot\r\n", FW_VERSION);
   strlcpy(tzRule, tzPosix(cfg.tz), sizeof tzRule);   // loadConfig guaranteed a valid zone
   setenv("TZ", tzRule, 1);
   tzset();
@@ -3450,7 +3456,7 @@ static void showFrame(uint32_t now) {
   else if (!lifeRunning) lifeSince = now;
   else if (cfg.lifeOff && !lifeOver && now - lifeSince >= cfg.lifeDays * 86400000UL) {
     lifeOver = true;
-    Serial.printf("Screen saver: Game of Life ran %u days, display off\n", cfg.lifeDays);
+    Serial.printf("Screen saver: Game of Life ran %u days, display off\r\n", cfg.lifeDays);
   }
   lifeRunning = life;
   if (asleep && (mode == SV_OFF || lifeOver)) {

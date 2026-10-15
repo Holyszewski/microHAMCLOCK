@@ -7,6 +7,9 @@ releases are listed in the Unreleased section.
 
 ## Unreleased
 
+- Fix: every line on the serial console now ends with CR LF. Most lines
+  ended with LF only, so terminals such as PuTTY showed them as a staircase,
+  each line starting where the previous one ended.
 - Docs: the manual is now for users only, reordered (installing, setup,
   screens, controls, settings, troubleshooting) and with a troubleshooting
   section. Building from source and the inner workings moved to the new
