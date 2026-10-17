@@ -7,6 +7,8 @@ releases are listed in the Unreleased section.
 
 ## Unreleased
 
+- Docs: noted that fetching straight from the public data servers is
+  provisional and wider use will need an intermediate layer.
 - New: the board tells when PSKReporter's live feed is down at the
   provider's end (the broker is up, but no spot from anyone for 5 minutes).
   The empty spot list then says `SPOT SOURCE DOWN (PSKREPORTER)` instead of

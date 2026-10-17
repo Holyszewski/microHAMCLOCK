@@ -99,6 +99,14 @@ after Wi-Fi comes up, so boards don't all ask at once. A failed download is
 retried after 2 minutes, doubling up to an hour. Requests carry a
 `microHAMCLOCK/<version>` User-Agent with the project's address.
 
+**Provisional.** Fetching the data straight from PSKReporter, hamqsl.com
+and KC2G is a provisional solution. These are public servers run by
+volunteers, and every board asks them on its own. That is acceptable for a
+modest number of boards with the polite behaviour above, but it does not
+scale. With wider use, an own intermediate layer (a cache or relay) between
+the servers and the boards will be needed, so the load on the sources does
+not grow with the number of boards.
+
 ## Maps
 
 `src/maps.h` is generated from [Natural Earth](https://www.naturalearthdata.com/)

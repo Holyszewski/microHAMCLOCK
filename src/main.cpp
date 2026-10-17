@@ -103,6 +103,11 @@ static const char *const LEGACY_TZ         = "Europe/Prague";
 static const char *const NTP_1      = "ntp.ufe.cz";     // Institute of Photonics and Electronics, Czech Academy of Sciences (national time standard)
 static const char *const NTP_2       = "tik.cesnet.cz";  // fallback: CESNET
 static const char *const NTP_3       = "pool.ntp.org";
+// NOTE: every board fetches from the public data servers below (PSKReporter, hamqsl.com, KC2G) directly.
+// This is provisional. It is fine for a modest number of boards that behave politely (long intervals,
+// jitter, back-off, an identifying User-Agent), but with wider use an own intermediate layer between the
+// servers and the boards will be needed, so the load on these volunteer-run servers does not grow with
+// the number of boards.
 static const char *const MQTT_HOST   = "mqtt.pskreporter.info";
 static const uint16_t    MQTT_PORT   = 1883;
 // The bridge that feeds PSKReporter spots to the broker publishes, once a second, when it last got a spot
