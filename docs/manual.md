@@ -312,7 +312,8 @@ board measures the output of its charger instead, usually around 4 V.
 powers the board off: the display says so for a moment, then the display,
 Wi-Fi and the LoRa radio turn off and the board goes to deep sleep. Only
 the **RST** button starts it again (PRG doesn't). Even powered off the
-board draws a little, so disconnect the cell for long storage.
+board draws a little, about 0.02 mA (measured on a Heltec V3 with 3.7 V on
+the battery connector), so disconnect the cell for long storage.
 
 ## Troubleshooting
 

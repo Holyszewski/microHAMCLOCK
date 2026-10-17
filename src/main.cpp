@@ -1300,6 +1300,7 @@ static void netTask(void *) {
 // differs between revisions: V3 and V3.1 have a pull-up and are active LOW, V3.2 has a transistor and
 // is active HIGH. The pull-up also tells them apart: the pin left as an input reads HIGH only on V3/V3.1.
 // Power off = deep sleep with no wake-up source; only the RST button (a full reset) starts the board.
+// It draws about 0.02 mA from the battery connector (measured on a V3/V3.1 at 3.7 V).
 
 static TaskHandle_t netTaskHandle;
 static bool boardV32Detected;

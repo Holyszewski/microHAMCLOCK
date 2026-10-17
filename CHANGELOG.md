@@ -7,6 +7,8 @@ releases are listed in the Unreleased section.
 
 ## Unreleased
 
+- Docs: the manual gives the current a powered-off board draws from the
+  battery, about 0.02 mA.
 - Docs: noted that fetching straight from the public data servers is
   provisional and wider use will need an intermediate layer.
 - New: the board tells when PSKReporter's live feed is down at the
