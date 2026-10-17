@@ -72,7 +72,7 @@ own: the board talks straight to public ham radio data feeds over Wi-Fi.
 
 ## Quick start
 
-1. **Flash** it in one click: open the **[web installer](INSTALLER_URL)** in Chrome, Edge or
+1. **Flash** it in one click: open the **[web installer](https://holyszewski.github.io/microHAMCLOCK/)** in Chrome, Edge or
    Opera on a computer, plug in the board, press **Install**. That's it, no tools to install.
 
    <details><summary>Prefer to flash by hand?</summary>
