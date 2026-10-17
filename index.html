@@ -1,0 +1,552 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (c) 2026 Matěj "Wolf" Holyszewski, OK2MTB -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>microHAMCLOCK installer</title>
+<meta name="description" content="Install and set up microHAMCLOCK on a Heltec WiFi LoRa 32 V3 straight from your browser.">
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --field: #ffffff;
+    --rule: #1c1d1f;
+    --hair: #d6d3ca;
+    --text: #1c1d1f;
+    --muted: #5f6166;
+    --accent: #1d5a73;
+    --accent-ink: #ffffff;
+    --ok: #2e7d4f;
+    --bad: #b3261e;
+    --warn: #8a5a00;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 16px 64px; }
+  header { text-align: center; margin-bottom: 40px; }
+  h1 {
+    margin: 0;
+    font: 700 clamp(1.9rem, 8vw, 2.6rem)/1.1 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    letter-spacing: .04em;
+    color: var(--accent);
+  }
+  .tag { margin: 8px 0 28px; color: var(--muted); }
+  .demo { display: block; width: 100%; max-width: 540px; height: auto; margin: 0 auto; }
+
+  /* Sections: a full-width rule and the step number in the left column, like a printed manual. */
+  .part {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 0 28px;
+    border-top: 2px solid var(--rule);
+    padding: 22px 0 34px;
+  }
+  .part > .side { padding-top: 2px; }
+  .num { font: 700 2.2rem/1 ui-monospace, Consolas, monospace; color: var(--accent); }
+  .part h2 { margin: 6px 0 0; font-size: 1.15rem; }
+  @media (max-width: 620px) {
+    .part { grid-template-columns: 1fr; }
+    .part > .side { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+    .part h2 { margin: 0; }
+  }
+  .lead { margin: 0 0 18px; color: var(--muted); }
+  .small { color: var(--muted); font-size: .9rem; }
+  button, esp-web-install-button button {
+    font: 600 1rem/1 system-ui, sans-serif;
+    color: var(--accent-ink);
+    background: var(--accent);
+    border: 0;
+    border-radius: 2px;
+    padding: 14px 24px;
+    cursor: pointer;
+  }
+  esp-web-install-button button { font-size: 1.05rem; padding: 16px 28px; }
+  button:hover { filter: brightness(1.12); }
+  button:disabled { opacity: .5; cursor: default; filter: none; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--text); padding: 10px 16px; }
+  button.secondary:hover { background: #ebe9e3; filter: none; }
+  .warn { color: var(--warn); }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+         border-bottom: 1px solid var(--hair); padding-bottom: 12px; margin-bottom: 18px; }
+  .bar .who { color: var(--muted); font-size: .92rem; }
+  .bar .who b { color: var(--ok); font-weight: 600; }
+  form { display: grid; gap: 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+  label { display: grid; gap: 6px; align-content: start; font-weight: 600; font-size: .95rem; }
+  label.check { display: flex; align-items: center; gap: 8px; font-weight: 400; color: var(--muted); }
+  input[type=text], input[type=password], select {
+    width: 100%;
+    font: 1rem system-ui, sans-serif;
+    color: var(--text);
+    background: var(--field);
+    border: 1px solid #b9b5ab;
+    border-radius: 2px;
+    padding: 11px 12px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .invalid input, .invalid select { border-color: var(--bad); }
+  .hint { font-weight: 400; font-size: .85rem; color: var(--muted); }
+  .err { font-weight: 400; font-size: .85rem; color: var(--bad); }
+  .row { display: flex; gap: 8px; }
+  .row input, .row select { flex: 1; }
+  .msg { margin: 12px 0 0; }
+  .msg.bad { color: var(--bad); }
+  ul.progress { list-style: none; padding: 0; margin: 4px 0 0; }
+  ul.progress li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; color: var(--muted);
+                   border-bottom: 1px solid var(--hair); }
+  ul.progress li::before { content: "○"; width: 1.2em; text-align: center; color: var(--muted); }
+  ul.progress li.busy { color: var(--text); }
+  ul.progress li.busy::before { content: "◌"; color: var(--accent); animation: spin 1.2s linear infinite; }
+  ul.progress li.done { color: var(--text); }
+  ul.progress li.done::before { content: "✓"; color: var(--ok); }
+  ul.progress li.fail { color: var(--bad); }
+  ul.progress li.fail::before { content: "✕"; color: var(--bad); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .done-box { margin-top: 18px; padding: 2px 0 2px 14px; border-left: 3px solid var(--ok); color: var(--ok); }
+  [hidden] { display: none !important; }
+  ol, ul { margin: 0; padding-left: 1.3em; }
+  .part ul li + li { margin-top: 8px; }
+  code { font: .92em ui-monospace, Consolas, monospace; background: #e9e7e0; padding: 1px 5px; }
+  a { color: var(--accent); }
+  footer { border-top: 2px solid var(--rule); padding-top: 14px; color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>microHAMCLOCK</h1>
+    <p class="tag">A pocket-sized ham radio clock that shows who is hearing you, right now.</p>
+    <img class="demo" src="img/demo.png" width="540" height="284"
+         alt="microHAMCLOCK cycling through its screens: clock, propagation, list of stations that heard you, map">
+  </header>
+
+  <section class="part">
+    <div class="side"><div class="num">01</div><h2>Install</h2></div>
+    <div>
+    <p class="lead">Connect the Heltec WiFi LoRa 32 V3 with a USB-C cable, click Install and pick its serial
+      port (usually “CP210x” or “USB to UART”). It takes about a minute.</p>
+    <div>
+      <esp-web-install-button manifest="manifest.json" id="install">
+        <button slot="activate">Install microHAMCLOCK 0.12.0</button>
+        <span slot="unsupported" class="warn">Your browser can't talk to USB devices. Please open this page
+          in Chrome, Edge or Opera on a computer.</span>
+        <span slot="not-allowed" class="warn">The installer needs a secure page (https).</span>
+      </esp-web-install-button>
+      <p class="small">Updating? Your settings are kept unless you choose to erase the device.</p>
+    </div>
+    </div>
+  </section>
+
+  <section class="part" id="setup">
+    <div class="side"><div class="num">02</div><h2>Set up</h2></div>
+    <div>
+    <p class="lead">Enter your Wi-Fi, callsign and locator here, over the same USB cable. Close the
+      installer window first. You can also set up the board later from your phone: hold <b>PRG</b> for
+      10 seconds and join the <b>MICROHAMCLOCK-xxxx</b> hotspot.</p>
+
+    <div id="s-idle">
+      <button id="connect">Connect to microHAMCLOCK</button>
+      <p class="msg" id="connect-msg" hidden></p>
+    </div>
+
+    <div id="s-connected" hidden>
+      <div class="bar">
+        <span class="who" id="who"></span>
+        <button class="secondary" id="disconnect">Disconnect</button>
+      </div>
+
+      <form id="form" novalidate>
+        <label id="f-lang">Display language
+          <select name="lang" id="lang"></select>
+        </label>
+        <label id="f-ssid">Wi-Fi network
+          <span class="row">
+            <select id="net"></select>
+            <button type="button" class="secondary" id="scan">Scan again</button>
+          </span>
+          <input type="text" name="ssid" id="ssid" maxlength="32" autocomplete="off" placeholder="Network name" hidden>
+          <span class="hint" id="scan-hint">2.4 GHz networks only.</span>
+          <span class="err" hidden></span>
+        </label>
+        <label id="f-pass">Wi-Fi password
+          <input type="password" name="pass" id="pass" maxlength="63" autocomplete="off">
+          <span class="err" hidden></span>
+        </label>
+        <label class="check"><input type="checkbox" id="open"> This network has no password</label>
+        <div class="grid2">
+          <label id="f-call">Callsign
+            <input type="text" name="call" id="call" maxlength="11" autocapitalize="characters" placeholder="W1AW" required>
+            <span class="err" hidden></span>
+          </label>
+          <label id="f-loc">Locator
+            <input type="text" name="loc" id="loc" maxlength="6" placeholder="JO70va" required>
+            <span class="hint">4 or 6 characters</span>
+            <span class="err" hidden></span>
+          </label>
+        </div>
+        <label id="f-tz">Time zone
+          <select name="tz" id="tz"></select>
+          <span class="err" hidden></span>
+        </label>
+        <div><button type="submit" id="save">Save to microHAMCLOCK</button></div>
+        <p class="msg bad" id="save-msg" hidden></p>
+      </form>
+
+      <div id="progress-box" hidden>
+        <ul class="progress" id="progress">
+          <li data-k="saved">Saved, restarting</li>
+          <li data-k="wifi">Connecting to Wi-Fi</li>
+          <li data-k="time">Getting the time</li>
+          <li data-k="spots">Listening for spots</li>
+        </ul>
+        <div class="done-box" id="done" hidden>All set! Your microHAMCLOCK is running. You can unplug it from the
+          computer and power it from any USB charger.</div>
+        <p><button type="button" class="secondary" id="again" hidden>Change settings</button></p>
+        <p class="msg bad" id="progress-msg" hidden></p>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <section class="part">
+    <div class="side"><div class="num">?</div><h2>Good to know</h2></div>
+    <ul>
+      <li><b>No port in the list?</b> Close any serial monitor that may be using it, try another
+        cable (some only charge), or install the
+        <a href="https://www.silabs.com/developer-tools/usb-to-uart-bridge-vcp-drivers">CP210x driver</a>.</li>
+      <li><b>Install doesn't start?</b> Hold <b>PRG</b>, tap <b>RST</b>, release <b>PRG</b>, and click
+        Install again.</li>
+      <li><b>More settings</b> (screen saver, night mode, brightness, NVIS, ionosonde) are on the hotspot
+        setup page: hold <b>PRG</b> for 10 seconds.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <a href="https://github.com/Holyszewski/microHAMCLOCK">Source code and manual</a> · GPL-3.0-or-later · 73!
+  </footer>
+</main>
+
+<script>
+// Talks to microHAMCLOCK over Web Serial. Commands are lines starting with STX (0x02); the board answers
+// with one line starting with "HC " (see "USB SETUP" in src/main.cpp). Other lines are its log.
+(() => {
+  const $ = (id) => document.getElementById(id);
+  let port = null, reader = null, writer = null, pipeDone = null, buffer = '';
+  let waiters = [], logListener = null, info = null;
+
+  function show(id, on) { $(id).hidden = !on; }
+  function message(id, text) { $(id).textContent = text || ''; $(id).hidden = !text; }
+
+  // ---------- serial port ----------
+  async function connect() {
+    message('connect-msg', '');
+    if (!('serial' in navigator)) {
+      message('connect-msg', 'Your browser can\'t talk to USB devices. Please use Chrome, Edge or Opera on a computer.');
+      return;
+    }
+    try {
+      const known = await navigator.serial.getPorts();
+      port = known.length === 1 ? known[0] : await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+    } catch (e) {
+      port = null;
+      if (e.name === 'NotFoundError') return;                     // no port chosen
+      message('connect-msg', e.name === 'InvalidStateError'
+        ? 'The port is busy. Close the installer window and any serial monitor, then try again.'
+        : 'Could not open the port: ' + e.message);
+      return;
+    }
+    try { await port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch (e) {}
+    const decoder = new TextDecoderStream();
+    pipeDone = port.readable.pipeTo(decoder.writable).catch(() => {});
+    reader = decoder.readable.getReader();
+    writer = port.writable.getWriter();
+    readLoop();
+    $('connect').disabled = true;
+    $('connect').textContent = 'Connecting…';
+    try {
+      info = await request('info', ['info'], 8000, 1000);         // repeated: the board may be booting
+    } catch (e) {
+      await disconnect();
+      message('connect-msg', 'microHAMCLOCK doesn\'t answer. Install the latest version first (step 1), then connect again.');
+      return;
+    }
+    fillForm();
+    show('s-idle', false);
+    show('s-connected', true);
+    scan();
+  }
+
+  async function disconnect() {
+    logListener = null;
+    try { if (reader) await reader.cancel(); } catch (e) {}
+    try { if (pipeDone) await pipeDone; } catch (e) {}
+    try { if (writer) writer.releaseLock(); } catch (e) {}
+    try { if (port) await port.close(); } catch (e) {}
+    port = reader = writer = pipeDone = null;
+    waiters.forEach((w) => w.reject(new Error('disconnected')));
+    waiters = [];
+    show('s-connected', false);
+    show('s-idle', true);
+    $('connect').disabled = false;
+    $('connect').textContent = 'Connect to microHAMCLOCK';
+  }
+
+  async function readLoop() {
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        let i;
+        while ((i = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, i).replace(/\s+$/, '');
+          buffer = buffer.slice(i + 1);
+          onLine(line);
+        }
+      }
+    } catch (e) {
+      if (port) { await disconnect(); message('connect-msg', 'The board was disconnected.'); }
+    }
+  }
+
+  function onLine(line) {
+    const m = line.match(/^HC (\w+) ?(.*)$/);
+    if (!m) { if (logListener) logListener(line); return; }
+    let data = null;
+    try { data = m[2] ? JSON.parse(m[2]) : null; } catch (e) { return; }
+    const w = waiters.find((w) => w.types.includes(m[1]));
+    if (w) { waiters = waiters.filter((x) => x !== w); w.resolve({ type: m[1], data }); }
+  }
+
+  async function send(cmd) {
+    await writer.write(new TextEncoder().encode('\x02' + cmd + '\r\n'));
+  }
+
+  // Sends cmd and waits for a reply of one of the types; repeatEvery resends while waiting.
+  function request(cmd, types, timeout, repeatEvery) {
+    return new Promise((resolve, reject) => {
+      let timer, again;
+      const w = {
+        types,
+        resolve: (r) => { clearTimeout(timer); clearInterval(again); resolve(types.length > 1 ? r : r.data); },
+        reject: (e) => { clearTimeout(timer); clearInterval(again); reject(e); },
+      };
+      waiters.push(w);
+      timer = setTimeout(() => { waiters = waiters.filter((x) => x !== w); w.reject(new Error('timeout')); }, timeout);
+      if (repeatEvery) again = setInterval(() => send(cmd).catch(() => {}), repeatEvery);
+      send(cmd).catch(w.reject);
+    });
+  }
+
+  // ---------- form ----------
+  function option(select, value, text, selected) {
+    const o = document.createElement('option');
+    o.value = value; o.textContent = text; o.selected = selected;
+    select.appendChild(o);
+  }
+
+  function browserZone(zones) {                                  // like the hotspot page
+    try {
+      const z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const hit = zones.find(([id, , aliases]) => (' ' + id + ' ' + aliases + ' ').includes(' ' + z + ' '));
+      if (hit) return hit[0];
+      const h = -new Date().getTimezoneOffset() / 60;
+      if (h === Math.round(h)) return h ? 'UTC' + (h > 0 ? '+' : '') + h : 'Etc/UTC';
+    } catch (e) {}
+    return null;
+  }
+
+  function status(text) {
+    $('who').innerHTML = '';
+    const b = document.createElement('b'); b.textContent = '● Connected';
+    $('who').append(b, ' · microHAMCLOCK ' + info.version + (text ? ' · ' + text : ''));
+  }
+
+  function fillForm() {
+    status(info.setupMode ? 'waiting for setup' : '');
+    $('lang').innerHTML = '';
+    info.langs.forEach(([code, name]) => option($('lang'), code, name, code === info.lang));
+    $('tz').innerHTML = '';
+    const tz = info.tzChosen ? info.tz : (browserZone(info.zones) || info.tz);
+    info.zones.forEach(([id, label]) => option($('tz'), id, label, id === tz));
+    $('ssid').value = info.ssid;
+    fillNets(false);
+    $('call').value = info.call;
+    $('loc').value = info.loc;
+    $('pass').value = '';
+    $('open').checked = false;
+    $('pass').placeholder = info.pass ? 'Leave empty to keep the saved password' : '';
+    clearErrors();
+    show('form', true);
+    show('progress-box', false);
+    message('save-msg', '');
+  }
+
+  // Wi-Fi: a list of scanned networks plus "Other network…" for typing the name. #ssid holds the choice.
+  const OTHER = '\u0000other';
+  let nets = [];
+
+  function fillNets(scanning) {
+    const sel = $('net'), current = $('ssid').value;
+    sel.innerHTML = '';
+    if (scanning) option(sel, '', 'Looking for networks…', true);
+    nets.forEach((n) => option(sel, n.ssid, n.ssid + ' · ' + n.rssi + ' dBm' + (n.open ? ' · open' : ''), n.ssid === current));
+    option(sel, OTHER, 'Other network (type the name)…', false);
+    if (scanning) { sel.disabled = true; return; }
+    sel.disabled = false;
+    if (!nets.some((n) => n.ssid === current)) {
+      if (!current && nets.length) sel.value = nets[0].ssid;
+      else sel.value = OTHER;
+    }
+    netChosen(false);
+  }
+
+  function netChosen(byUser) {
+    const v = $('net').value, other = v === OTHER;
+    $('ssid').hidden = !other;
+    if (!other) $('ssid').value = v;
+    else if (byUser) { $('ssid').value = ''; $('ssid').focus(); }
+    const n = nets.find((x) => x.ssid === v);
+    if (byUser && n) { $('open').checked = n.open; $('pass').disabled = n.open; }
+  }
+
+  async function scan() {
+    $('scan').disabled = true;
+    $('scan-hint').textContent = 'Looking for networks…';
+    fillNets(true);
+    try {
+      // The first scans after the board starts can come back empty, so try a few times.
+      for (let i = 0; i < 3; i++) {
+        nets = await request('scan', ['scan'], 20000);
+        if (nets.length) break;
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      $('scan-hint').textContent = nets.length
+        ? 'Found ' + nets.length + ' network' + (nets.length > 1 ? 's' : '') + '. Only 2.4 GHz networks work.'
+        : 'No networks found. Choose “Other network” and type the name, or scan again.';
+    } catch (e) {
+      $('scan-hint').textContent = 'The scan didn\'t finish. Choose “Other network” and type the name, or scan again.';
+    }
+    fillNets(false);
+    $('scan').disabled = false;
+  }
+
+  function clearErrors() {
+    document.querySelectorAll('#form label').forEach((l) => l.classList.remove('invalid'));
+    document.querySelectorAll('#form .err').forEach((e) => { e.hidden = true; });
+  }
+
+  function fieldError(field, text) {
+    const label = $('f-' + field);
+    if (!label) { message('save-msg', text); return; }
+    label.classList.add('invalid');
+    const e = label.querySelector('.err');
+    e.textContent = text; e.hidden = false;
+    label.querySelector('input, select').focus();
+  }
+
+  function localCheck() {                                         // the board checks again
+    if (!$('ssid').value.trim()) return ['ssid', 'Enter the Wi-Fi network name.'];
+    const p = $('pass').value;
+    if (!$('open').checked && p && (p.length < 8 || p.length > 63)) return ['pass', 'A Wi-Fi password has 8 to 63 characters.'];
+    if (!/^[A-Za-z0-9/]{3,11}$/.test($('call').value.trim())) return ['call', 'A callsign has 3 to 11 characters: letters, digits and slash.'];
+    if (!/^[A-Ra-r]{2}[0-9]{2}([A-Xa-x]{2})?$/.test($('loc').value.trim())) return ['loc', 'A locator looks like JO70 or JO70va.'];
+    return null;
+  }
+
+  async function save(ev) {
+    ev.preventDefault();
+    clearErrors();
+    message('save-msg', '');
+    const bad = localCheck();
+    if (bad) { fieldError(...bad); return; }
+    const v = { lang: $('lang').value, ssid: $('ssid').value.trim(), call: $('call').value.trim(),
+                loc: $('loc').value.trim(), tz: $('tz').value };
+    if ($('open').checked) v.open = '1';
+    else if ($('pass').value) v.pass = $('pass').value;
+    const q = Object.entries(v).map(([k, x]) => k + '=' + encodeURIComponent(x)).join('&');
+    $('save').disabled = true;
+    try {
+      const r = await request('save ' + q, ['ok', 'error'], 5000);
+      if (r.type === 'error') { fieldError(r.data.field, r.data.msg); return; }
+      $('pass').value = '';
+      watchStartup(v.call.toUpperCase());
+    } catch (e) {
+      message('save-msg', 'microHAMCLOCK didn\'t answer. Check the cable and try again.');
+    } finally {
+      $('save').disabled = false;
+    }
+  }
+
+  // ---------- progress after saving: read the board's log ----------
+  function step(k, state) {
+    document.querySelector('#progress li[data-k="' + k + '"]').className = state;
+  }
+
+  function watchStartup(call) {
+    status('starting up');
+    show('form', false);
+    show('progress-box', true);
+    show('done', false);
+    show('again', false);
+    message('progress-msg', '');
+    document.querySelectorAll('#progress li').forEach((li) => { li.className = ''; });
+    document.querySelector('#progress li[data-k="spots"]').textContent = 'Listening for spots of ' + call;
+    step('saved', 'done');
+    step('wifi', 'busy');
+    let lastWifiError = '';
+    const wifiTimer = setTimeout(() => {
+      step('wifi', 'fail');
+      message('progress-msg', 'microHAMCLOCK can\'t connect to the Wi-Fi' + (lastWifiError ? ' (' + lastWifiError + ')' : '') +
+        '. Check the network name and password and save again.');
+      showFormAgain();
+    }, 45000);
+    logListener = (line) => {
+      let m;
+      if ((m = line.match(/^WiFi: cannot connect to .* \((.*), code \d+\)$/))) {
+        lastWifiError = m[1];                                     // one failed try at boot is normal
+      } else if (/^WiFi: connected/.test(line)) {
+        clearTimeout(wifiTimer); step('wifi', 'done'); step('time', 'busy');
+      } else if (/^NTP: time set/.test(line)) {
+        step('time', 'done'); step('spots', 'busy');
+      } else if (/^MQTT: subscribing/.test(line)) {
+        step('time', 'done'); step('spots', 'done');
+        status('running');
+        show('done', true);
+        show('again', true);
+        logListener = null;
+      }
+    };
+  }
+
+  function showFormAgain() {
+    logListener = null;
+    setTimeout(async () => {
+      try { info = await request('info', ['info'], 8000, 1000); fillForm(); } catch (e) {}
+    }, 500);
+  }
+
+  $('connect').addEventListener('click', connect);
+  $('disconnect').addEventListener('click', disconnect);
+  $('again').addEventListener('click', showFormAgain);
+  $('scan').addEventListener('click', scan);
+  $('net').addEventListener('change', () => netChosen(true));
+  $('form').addEventListener('submit', save);
+  $('open').addEventListener('change', () => { $('pass').disabled = $('open').checked; });
+  $('call').addEventListener('input', () => { $('call').value = $('call').value.toUpperCase(); });
+  // The installer needs the port for itself.
+  $('install').addEventListener('click', () => { if (port) disconnect(); }, true);
+  window.addEventListener('pagehide', () => { if (port) disconnect(); });
+})();
+</script>
+</body>
+</html>
