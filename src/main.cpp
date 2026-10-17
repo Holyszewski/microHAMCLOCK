@@ -105,6 +105,10 @@ static const char *const NTP_2       = "tik.cesnet.cz";  // fallback: CESNET
 static const char *const NTP_3       = "pool.ntp.org";
 static const char *const MQTT_HOST   = "mqtt.pskreporter.info";
 static const uint16_t    MQTT_PORT   = 1883;
+// The bridge that feeds PSKReporter spots to the broker publishes, once a second, when it last got a spot
+// from PSKReporter. When that time stops moving, the feed is down at the provider's end, not here.
+static const char *const FEED_TOPIC  = "pskr2mqtt/stats/last_spot_received_at";
+static const uint16_t    FEED_DOWN_MIN = 5;     // normally thousands of spots arrive every minute
 static const char *const SOLAR_URL   = "https://www.hamqsl.com/solarxml.php";
 
 // Downloads from the data servers: a failed one is retried after FETCH_RETRY_MIN_MS, the wait doubling
@@ -558,6 +562,16 @@ static void subsolarPoint(time_t t, float &decl, float &lon) {
   lon = fmod(ra - gmst + 540.0, 360.0) - 180.0;
 }
 
+// Days since 1 Jan 1970 (newlib has no timegm, so UTC time is assembled by hand).
+static int32_t daysFromCivil(int y, int m, int d) {
+  y -= m <= 2;
+  int era = (y >= 0 ? y : y - 399) / 400;
+  int yoe = y - era * 400;
+  int doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+  int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146097 + doe - 719468;
+}
+
 static bool timeValid() { return time(nullptr) > 1700000000; }
 
 // Night per settings (local time). Without valid time there is no night.
@@ -629,6 +643,9 @@ static const uint32_t WIFI_RETRY_MS = 60000;   // how often to retry connecting 
 // so a failure reaches the display only when Wi-Fi has been down this long.
 static const uint32_t WIFI_FAIL_SHOW_MS = 20000;
 static volatile uint32_t spotsTotal;
+// When the PSKReporter feed last got a spot (unix, from FEED_TOPIC or our own spots), 0 = not known yet.
+static volatile uint32_t feedLastSpot;
+static volatile bool feedWatched;        // the broker accepted the FEED_TOPIC subscription
 static bool asleep;                     // the saver is on (display task only)
 // Console "saver": the saver is on right away until the next activity; saverForceMode -1 = the set one.
 static bool saverForced;
@@ -643,6 +660,12 @@ static const int SCREEN_STATUS = 100;
 static uint32_t spotAge(const Spot &s, uint32_t nowUnix, uint32_t nowMs) {
   if (nowUnix && s.t && nowUnix >= s.t) return nowUnix - s.t;
   return (nowMs - s.rxMs) / 1000;
+}
+
+// The feed is connected but has had no spot from PSKReporter for FEED_DOWN_MIN (needs valid time).
+static bool feedDown() {
+  uint32_t last = feedLastSpot;
+  return mqttUp && last && timeValid() && (uint32_t)time(nullptr) > last + FEED_DOWN_MIN * 60u;
 }
 
 // The same station on the same band is just updated.
@@ -794,6 +817,8 @@ static void mqttSubscribe() {
     body[n++] = 0;                  // QoS 0
     if (!quietLog) Serial.printf("MQTT: subscribing to %s\r\n", topic);
   }
+  n += putStr(body + n, FEED_TOPIC);   // the last topic, its SUBACK result may fail
+  body[n++] = 0;
   mqttSend(0x82, body, n);
   mqttSetState(MS_WAIT_SUBACK);
 }
@@ -847,7 +872,16 @@ static void handleSpot(const char *js) {
   // Only fresh spots wake: some programs send reports delayed by even hours.
   uint32_t nowUnix = timeValid() ? time(nullptr) : 0;
   if (!nowUnix || !s.t || nowUnix < s.t + SPOT_WAKE_MAX_AGE_MIN * 60u) spotWakeAt = millis() | 1;
+  if (nowUnix > feedLastSpot) feedLastSpot = nowUnix;   // a spot of our own proves the feed works
   if (!quietLog) Serial.printf("Spot: %s %s %+d dB %u km\r\n", s.call, s.band, s.snr, s.km);
+}
+
+// FEED_TOPIC payload: a plain ISO time, "2026-10-17T16:01:58.635Z".
+static void handleFeed(const char *js) {
+  int Y, M, D, h, m, sec;
+  if (sscanf(js, "%d-%d-%dT%d:%d:%d", &Y, &M, &D, &h, &m, &sec) != 6) return;
+  uint32_t t = (int64_t)daysFromCivil(Y, M, D) * 86400 + h * 3600 + m * 60 + sec;
+  if (t > feedLastSpot) feedLastSpot = t;
 }
 
 static void mqttPacket(uint8_t type, const uint8_t *p, uint32_t len) {
@@ -861,11 +895,16 @@ static void mqttPacket(uint8_t type, const uint8_t *p, uint32_t len) {
         mqttDrop("server refused the connection");
       }
       break;
-    case 9: {                       // SUBACK: after the identifier, one result per topic
-      bool ok = len >= 3;
-      for (uint32_t i = 2; i < len; i++) ok &= p[i] != 0x80;
-      if (ok) mqttSetState(MS_READY);
-      else mqttDrop("subscription refused");
+    case 9: {                       // SUBACK: after the identifier, one result per topic, FEED_TOPIC last
+      bool ok = len >= 4;
+      for (uint32_t i = 2; i + 1 < len; i++) ok &= p[i] != 0x80;
+      if (ok) {
+        feedWatched = p[len - 1] != 0x80;
+        if (!feedWatched && !quietLog) Serial.println("MQTT: feed statistics refused, the feed is not watched");
+        mqttSetState(MS_READY);
+      } else {
+        mqttDrop("subscription refused");
+      }
       break;
     }
     case 3: {                       // PUBLISH
@@ -876,7 +915,9 @@ static void mqttPacket(uint8_t type, const uint8_t *p, uint32_t len) {
       char js[sizeof mqttBuf + 1];
       memcpy(js, p + off, len - off);
       js[len - off] = 0;
-      handleSpot(js);
+      size_t topicLen = p[0] << 8 | p[1];
+      if (topicLen == strlen(FEED_TOPIC) && !memcmp(p + 2, FEED_TOPIC, topicLen)) handleFeed(js);
+      else handleSpot(js);
       break;
     }
     default:                        // PINGRESP and the rest are enough as a sign of life
@@ -924,6 +965,20 @@ static void mqttService() {
   if (mqttState != MS_READY && now - mqttStateSince > 10000) { mqttDrop("server did not respond"); return; }
   if (now - mqttLastTx > 30000) mqttSend(0xC0, nullptr, 0);   // PINGREQ
   if (now - mqttLastRx > 100000) mqttDrop("no reply to ping");
+
+  static bool wasDown;
+  bool down = feedDown();
+  if (down != wasDown && !quietLog) {
+    if (down) {
+      time_t t = feedLastSpot;
+      struct tm u;
+      gmtime_r(&t, &u);
+      Serial.printf("MQTT: PSKReporter feed down, no spot since %02d:%02d:%02d UTC\r\n", u.tm_hour, u.tm_min, u.tm_sec);
+    } else {
+      Serial.println("MQTT: PSKReporter feed back");
+    }
+  }
+  wasDown = down;
 }
 
 // ============================ PROPAGATION (hamqsl.com, ionosonde) ============================
@@ -993,16 +1048,6 @@ static bool fetchSolar() {
   }
   if (!quietLog) Serial.printf("Propagation: SFI %s SN %s A %s K %s X %s\r\n", s.sfi, s.sn, s.a, s.k, s.xray);
   return true;
-}
-
-// Days since 1 Jan 1970 (newlib has no timegm, so UTC time is assembled by hand).
-static int32_t daysFromCivil(int y, int m, int d) {
-  y -= m <= 2;
-  int era = (y >= 0 ? y : y - 399) / 400;
-  int yoe = y - era * 400;
-  int doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
-  int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-  return era * 146097 + doe - 719468;
 }
 
 // Number after "key": in KC2G JSON (with spaces); null or missing key → false.
@@ -1722,6 +1767,22 @@ static void printStatus() {
   unlock();
   Serial.printf("MQTT: %s, spots in the last %d min: %d, received in total: %lu\r\n",
                 mqttUp ? "connected" : "not connected", SPOT_WINDOW_MIN, n, (unsigned long)spotsTotal);
+  uint32_t feedAt = feedLastSpot;
+  if (!mqttUp)                 Serial.println("PSKReporter feed: unknown (MQTT not connected)");
+  else if (!feedWatched)       Serial.println("PSKReporter feed: not watched (the broker refused the statistics)");
+  else if (!feedAt)            Serial.println("PSKReporter feed: unknown (no statistics yet)");
+  else if (!timeValid())       Serial.println("PSKReporter feed: unknown (waiting for NTP)");
+  else {
+    time_t t = feedAt;
+    struct tm u;
+    gmtime_r(&t, &u);
+    uint32_t nowUnix = time(nullptr), ago = nowUnix > feedAt ? nowUnix - feedAt : 0;
+    if (feedDown())
+      Serial.printf("PSKReporter feed: DOWN at the provider, no spot since %02d:%02d:%02d UTC (%lu min ago)\r\n",
+                    u.tm_hour, u.tm_min, u.tm_sec, (unsigned long)(ago / 60));
+    else
+      Serial.printf("PSKReporter feed: OK, last spot %lu s ago\r\n", (unsigned long)ago);
+  }
   if (s.ok) Serial.printf("Propagation: SFI %s SN %s A %s K %s X %s\r\n", s.sfi, s.sn, s.a, s.k, s.xray);
   else      Serial.println("Propagation: no data yet");
   if (cfg.iono[0]) Serial.printf("Ionosonde choice: %s (set by hand)\r\n", cfg.iono);
@@ -2975,6 +3036,11 @@ static void renderPskList() {
     drawTextCenter(tr(S_NO_SPOTS), 22);
     snprintf(buf, sizeof buf, tr(S_LAST_MIN), SPOT_WINDOW_MIN);
     drawTextCenter(buf, 32);
+    if (wifiUp && feedDown()) {     // the provider sends nothing: say so, "go on the air" would not help
+      drawTextCenter(tr(S_FEED_DOWN), 41);
+      drawTextCenter(tr(S_FEED_DOWN_WHO), 50);
+      return;
+    }
     drawTextCenter(!wifiUp ? tr(WIFI_FAIL_TEXT[wifiFail]) : !mqttUp ? tr(S_MQTT_CONNECTING) : tr(S_TRANSMIT_HINT), 50);
     return;
   }
@@ -3128,7 +3194,8 @@ static void renderStatus() {
   char ionoCode[sizeof iono.code];
   strcpy(ionoCode, iono.code);
   unlock();
-  snprintf(buf, sizeof buf, "MQTT %s %lu", mqttUp ? "OK" : "--", (unsigned long)spotsTotal);
+  if (feedDown()) snprintf(buf, sizeof buf, "PSKR DOWN %lu", (unsigned long)spotsTotal);   // connected, but no spots come
+  else snprintf(buf, sizeof buf, "MQTT %s %lu", mqttUp ? "OK" : "--", (unsigned long)spotsTotal);
   drawText(buf, 0, 30);
   snprintf(buf, sizeof buf, tr(S_SPOTS), n);
   drawTextRight(buf, 127, 30);

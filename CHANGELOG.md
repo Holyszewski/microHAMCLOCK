@@ -7,6 +7,12 @@ releases are listed in the Unreleased section.
 
 ## Unreleased
 
+- New: the board tells when PSKReporter's live feed is down at the
+  provider's end (the broker is up, but no spot from anyone for 5 minutes).
+  The empty spot list then says `SPOT SOURCE DOWN (PSKREPORTER)` instead of
+  `GO ON THE AIR :)`, the status screen shows `PSKR DOWN`, the `status`
+  command prints since when no spot came, and the log notes each outage
+  and recovery. Before, an outage looked just like nobody hearing you.
 - Fix: every line on the serial console now ends with CR LF. Most lines
   ended with LF only, so terminals such as PuTTY showed them as a staircase,
   each line starting where the previous one ended.

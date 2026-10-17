@@ -74,7 +74,19 @@ brightness, refresh intervals…) are in the `SETTINGS` section at the top of
   subscription `pskr/filter/v2/+/+/YOURCALL/#` (a `/` in the callsign
   becomes `.`). The callsign is subscribed as entered, in its base form and
   with each suffix in `CALL_SUFFIXES` (`/P`, `/M`). Spots older than an hour
-  expire; a station is kept once per band.
+  expire; a station is kept once per band. The same SUBSCRIBE also asks for
+  `pskr2mqtt/stats/last_spot_received_at`, which the bridge feeding the
+  broker publishes once a second as a plain ISO time
+  (`2026-10-17T16:01:58.635Z`, not retained). When that time, or our own
+  latest spot, is more than `FEED_DOWN_MIN` (5) minutes old while MQTT is
+  connected and the clock is set, the feed counts as down (`feedDown()`):
+  the empty spot list says `SPOT SOURCE DOWN (PSKREPORTER)`, the status
+  screen `PSKR DOWN` instead of `MQTT OK`, `status` prints since when, and the log says
+  `MQTT: PSKReporter feed down …` / `… feed back` on each change. The rest
+  of `pskr2mqtt/stats/#` (about 9 messages a second) is not subscribed. A
+  refused stats subscription (its SUBACK result is the last one) only turns
+  the watch off. On 2026-10-17 the bridge lost PSKReporter at 16:02 UTC
+  while the broker stayed up, which is the case this catches.
 - **Ionosonde** – `https://prop.kc2g.com/api/stations.json`, every 15
   minutes. The board takes the nearest station within 1500 km of the
   locator with a measurement younger than 90 minutes, and keeps the current

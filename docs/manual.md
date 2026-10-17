@@ -155,7 +155,7 @@ Spots are collected for your callsign in its base form and with `/P` and
 | Propagation     | SFI, SN, A, K, the recommended NVIS band, X-ray, foF2 and MUF(3000) from the nearest ionosonde, day and night conditions for 80–10 m (good ones are framed) |
 | Heard me: list  | stations that heard you in the last hour: callsign, band, SNR, km |
 | Heard me: map   | the same on a map; dotted land = day, outline only = night (the grey line) |
-| Status          | Wi-Fi network, IP address and signal, the connection to PSKReporter (MQTT), spot count, when the propagation data arrived and when the ionosonde measured (UTC) with the station code, uptime, time sync, battery voltage and firmware version |
+| Status          | Wi-Fi network, IP address and signal, the connection to PSKReporter (`MQTT OK`, `MQTT --` not connected, `PSKR DOWN` connected but PSKReporter sends no spots), spot count, when the propagation data arrived and when the ionosonde measured (UTC) with the station code, uptime, time sync, battery voltage and firmware version |
 
 **Propagation.** The solar data and band conditions come from N0NBH, foF2
 and MUF(3000) from the nearest ionosonde with a fresh measurement (see
@@ -321,6 +321,12 @@ board draws a little, so disconnect the cell for long storage.
   10 s and enter the correct details. The network must be on 2.4 GHz.
 - **The spot list is empty.** That's normal after power-on. Spots appear
   once someone decodes you and their program reports it to PSKReporter.
+- **`SPOT SOURCE DOWN (PSKREPORTER)` on the spot list, `PSKR DOWN` on the
+  status screen.** The board is connected, but PSKReporter's live feed has
+  passed on no spot from anyone for 5 minutes. The outage is at the
+  provider's end, not on your board or your network, so there is nothing to
+  fix here: spots come back by themselves once the feed runs again. The
+  `status` command says since when no spot came.
 - **The phone doesn't open the setup page by itself.** Open
   `http://4.3.2.1` by hand; turning off mobile data may help.
 - **The flasher doesn't find the board.** Use a cable that carries data. If
@@ -340,7 +346,7 @@ These commands are handy for users; the console is always in English.
 | command    | what it does                                                  |
 |------------|---------------------------------------------------------------|
 | `setup`    | the step-by-step setup wizard, see [Over USB](#over-usb-serial-console) |
-| `status`   | prints the settings, board version, battery voltage, Wi-Fi, time, MQTT, spot count and propagation data |
+| `status`   | prints the settings, board version, battery voltage, Wi-Fi, time, MQTT, whether the PSKReporter feed works, spot count and propagation data |
 | `screen`   | shows a screen on the display: `screen clock`, `screen propagation`, `screen list`, `screen map` or `screen status`. Handy when you can't reach the button |
 | `saver`    | turns the screen saver on right away: `saver` the one you set, `saver off`, `saver life` or `saver dim` a given one. The settings don't change; the button, or a spot when spots may wake the display, ends it as usual |
 | `off`      | powers the board off, like the long press on the status screen |
