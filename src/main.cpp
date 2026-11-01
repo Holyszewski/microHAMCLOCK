@@ -1751,8 +1751,8 @@ static void printStatus() {
                 cfg.mapDe ? "on" : "off", cfg.mapUk ? "on" : "off", cfg.mapUs ? "on" : "off");
   Serial.printf("Board: Heltec %s (%s)\r\n", boardName(), cfg.board == BD_AUTO ? "detected" : "set by hand");
   if (batteryPresent(batteryMv))
-    Serial.printf("Battery: %u.%02u V, about %d %% (means little on USB or without a cell)\r\n", batteryMv / 1000,
-                  batteryMv % 1000 / 10, batteryPercent(batteryMv));
+    Serial.printf("Battery: %u.%02u V, about %d %% (on USB the charging voltage, without a cell the charger's, "
+                  "about 4 V)\r\n", batteryMv / 1000, batteryMv % 1000 / 10, batteryPercent(batteryMv));
   else
     Serial.printf("Battery: none (%u mV)\r\n", batteryMv);
   if (!cfg.ssid[0]) Serial.println("WiFi: not set up (command setup)");

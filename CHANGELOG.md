@@ -7,6 +7,9 @@ releases are listed in the Unreleased section.
 
 ## Unreleased
 
+- Changed: the battery line of the `status` command says what the voltage
+  means on USB: the charging voltage, or the charger's output of about 4 V
+  without a cell.
 - Docs: the manual gives the current a powered-off board draws from the
   battery, about 0.02 mA.
 - Docs: noted that fetching straight from the public data servers is
