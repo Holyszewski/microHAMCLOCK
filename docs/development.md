@@ -25,8 +25,9 @@ reading the serial log: `WiFi: connected`, `MQTT: subscribing to …`,
 
 ## Version numbers
 
-Versions are numbered `0.x.y` while the project is unfinished; what changed
-is in the [changelog](../CHANGELOG.md). Before each build,
+Versions are numbered `X.Y.Z` since 1.0.0 (`0.x.y` before, while the
+project was unfinished); what changed is in the
+[changelog](../CHANGELOG.md). Before each build,
 `tools/version.py` takes the version from `git describe`. Firmware built
 between releases shows `+` and the number of commits since the release
 after the number on the display (for example `v0.5.1+3`), and the exact git

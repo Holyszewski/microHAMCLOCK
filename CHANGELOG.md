@@ -1,12 +1,14 @@
 # Changelog
 
-Versions are numbered `0.x.y` while the project is unfinished: `x` goes
-up with a new feature, `y` with a fix. Each version has a git tag
+Versions are numbered `X.Y.Z`: `Y` goes up with a new feature, `Z` with
+a fix, and `X` only with a big change. Up to 0.12.0, while the project
+was unfinished, they were numbered `0.x.y`. Each version has a git tag
 `vX.Y.Z`. The number changes only at a release; changes between
 releases are listed in the Unreleased section.
 
-## Unreleased
+## 1.0.0 – 2026-11-01
 
+- The first stable release: the firmware is complete for its purpose.
 - Changed: the battery line of the `status` command says what the voltage
   means on USB: the charging voltage, or the charger's output of about 4 V
   without a cell.

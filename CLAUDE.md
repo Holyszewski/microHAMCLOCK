@@ -29,15 +29,15 @@ No third-party source code is in the repo (the Game of Life parts are the mainta
 
 ## Versioning
 
-The repo is on GitHub (remote `origin`). Push only `main` and release tags by name (`git push origin vX.Y.Z`), never `git push --tags` or `--mirror`. Versions are `0.x.y` while the project is unfinished: bump `x` for a feature and `y` for a fix. **The number changes only at a release, and only when the maintainer says so.** The project switched to this scheme after 0.5.1; before that every change was a release.
+The repo is on GitHub (remote `origin`). Push only `main` and release tags by name (`git push origin vX.Y.Z`), never `git push --tags` or `--mirror`. Versions are `X.Y.Z` since 1.0.0 (2026-11-01, the maintainer declared the project complete): bump `Y` for a feature and `Z` for a fix; `X` only for a big change and only when the maintainer chooses it (such as one that costs the boards their settings). Up to 0.12.0 they were `0.x.y` while the project was unfinished. **The number changes only at a release, and only when the maintainer says so.** The project switched to release-only numbers after 0.5.1; before that every change was a release.
 
 - **Between releases (every commit):**
-  - write a normal English commit message, without the `microHAMCLOCK 0.x.y:` prefix,
+  - write a normal English commit message, without the `microHAMCLOCK X.Y.Z:` prefix,
   - add the change to the `## Unreleased` section at the top of `CHANGELOG.md` (create it if missing),
   - don't tag.
 - **Version string:** `tools/version.py` (a PlatformIO `pre:` script) writes the gitignored `src/fw_version.h` before each build from `git describe`, e.g. `0.5.1-3-g1a2b3c4` (3 commits after v0.5.1), plus `-dirty` with uncommitted changes. `status`, the serial banner and the web page show it in full. The OLED shows `FW_VERSION_OLED` as `v0.5.1+3` (no hash; `+` alone for uncommitted changes on a release), with a lowercase `v` glyph in the font. On the status screen it sits bottom right, because next to the callsign in the header it wouldn't fit in 21 chars. Never hardcode the number in the source.
 - **Release:**
-  1. pick the number from what's in `Unreleased` (any feature → `x+1`, `y=0`; only fixes → `y+1`),
+  1. pick the number from what's in `Unreleased` (any feature → `Y+1`, `Z=0`; only fixes → `Z+1`),
   2. rename the section to `## X.Y.Z – date`,
   3. `python tools/release.py build X.Y.Z`: the release build (`MICROHAMCLOCK_RELEASE=X.Y.Z python -m platformio run`; `version.py` refuses a number that doesn't match the first CHANGELOG heading) and both distribution binaries in `firmware/` (see Distribution),
   4. make one commit `microHAMCLOCK X.Y.Z: …` (`HamClock X.Y.Z` up to 0.8.0) and tag `vX.Y.Z`. A build from the tag then gives exactly `X.Y.Z`,
